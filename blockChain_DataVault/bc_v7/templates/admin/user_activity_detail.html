@@ -1,0 +1,230 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ target_user['name'] }} · Activity{% endblock %}
+{% block page_title %}User Activity{% endblock %}
+
+{% block content %}
+
+<a href="{{ url_for('admin_user_activity') }}" class="text-muted small d-inline-flex align-items-center gap-1 mb-3">
+  <i class="bi bi-arrow-left"></i> Back to all users
+</a>
+
+<!-- Profile header -->
+<div class="panel-card mb-3">
+  <div class="d-flex align-items-center gap-3 p-3 flex-wrap">
+    <div class="ua-avatar" style="width:56px;height:56px;font-size:1.3rem;">
+      {% if target_user['avatar'] %}
+        <img src="{{ url_for('static', filename='uploads/avatars/' + target_user['avatar']) }}" alt="">
+      {% else %}
+        {{ target_user['name'][:1]|upper }}
+      {% endif %}
+    </div>
+    <div class="flex-grow-1">
+      <div class="fw-bold" style="font-family:var(--font-display); font-size:1.1rem;">{{ target_user['name'] }}</div>
+      <div class="text-muted small">{{ target_user['email'] }}</div>
+    </div>
+    <div class="text-end">
+      <div class="text-muted small">Member since</div>
+      <div class="fw-semibold small">{{ target_user['created_at'] }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- KPI stat cards -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-value">{{ total_seconds|hms }}</div>
+          <div class="stat-label">Time on Portal</div>
+        </div>
+        <div class="stat-icon" style="background: var(--teal);"><i class="bi bi-stopwatch"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-value">{{ actions|length }}</div>
+          <div class="stat-label">Logged Actions</div>
+        </div>
+        <div class="stat-icon" style="background: var(--ink);"><i class="bi bi-activity"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-value">{{ uploads }}</div>
+          <div class="stat-label">Datasets Uploaded</div>
+        </div>
+        <div class="stat-icon" style="background: var(--amber);"><i class="bi bi-upload"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-value">{{ req_approved }}/{{ req_total }}</div>
+          <div class="stat-label">Requests Approved</div>
+        </div>
+        <div class="stat-icon" style="background: var(--green);"><i class="bi bi-clipboard-check"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="chart-card">
+      <h6 class="mb-3" style="font-family:var(--font-display);">Time Spent — Last 14 Days</h6>
+      <canvas id="timeChart" height="160"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="chart-card">
+      <h6 class="mb-3" style="font-family:var(--font-display);">Activity Breakdown</h6>
+      <canvas id="actionChart" height="160"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Session log -->
+<div class="panel-card mb-3">
+  <div class="panel-head">
+    <h5>Login Sessions</h5>
+    <span class="text-muted small">{{ sessions|length }} sessions</span>
+  </div>
+  {% if sessions %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Login</th>
+          <th>Logout</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td class="text-muted">{{ s['login_at'] }}</td>
+          <td class="text-muted">
+            {% if s['logout_at'] %}
+              {{ s['logout_at'] }}
+            {% else %}
+              <span class="status-pill approved"><i class="bi bi-circle-fill"></i> Online now</span>
+            {% endif %}
+          </td>
+          <td class="fw-semibold">
+            {% if s['duration_seconds'] is not none %}
+              {{ s['duration_seconds']|hms }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-stopwatch"></i>
+    No login sessions recorded yet.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Action log -->
+<div class="panel-card">
+  <div class="panel-head">
+    <h5>Activity Log</h5>
+    <span class="text-muted small">{{ actions|length }} entries</span>
+  </div>
+  {% if actions %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Details</th>
+          <th>Date / Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in actions %}
+        <tr>
+          <td class="fw-semibold">{{ a['action'] }}</td>
+          <td class="text-muted">{{ a['details'] or '—' }}</td>
+          <td class="text-muted">{{ a['created_at'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clock-history"></i>
+    No activity recorded yet for this user.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  const chartData = {{ chart_data|safe }};
+
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)';
+  const textColor = isDark ? '#94A3B8' : '#64748B';
+
+  new Chart(document.getElementById('timeChart'), {
+    type: 'line',
+    data: {
+      labels: chartData.dayLabels,
+      datasets: [{
+        label: 'Minutes spent',
+        data: chartData.dayMinutes,
+        borderColor: '#3B5A78',
+        backgroundColor: 'rgba(59, 90, 120, 0.12)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 3,
+        pointBackgroundColor: '#3B5A78',
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('actionChart'), {
+    type: chartData.actionLabels.length ? 'doughnut' : 'bar',
+    data: {
+      labels: chartData.actionLabels.length ? chartData.actionLabels : ['No activity yet'],
+      datasets: [{
+        data: chartData.actionValues.length ? chartData.actionValues : [1],
+        backgroundColor: ['#3B5A78','#14B8A6','#F59E0B','#EF4444','#22C55E','#0F172A','#64748B','#94A3B8'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom', labels: { color: textColor, boxWidth: 10, font: { size: 11 } } }
+      }
+    }
+  });
+</script>
+{% endblock %}

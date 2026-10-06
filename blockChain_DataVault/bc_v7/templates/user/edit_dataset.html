@@ -1,0 +1,293 @@
+{% extends "user/base_user.html" %}
+{% block title %}Edit Dataset{% endblock %}
+{% block page_title %}Edit Dataset{% endblock %}
+
+{% block extra_head %}
+<style>
+.editor-wrap { display:flex; flex-direction:column; gap:16px; }
+.editor-topbar {
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.editor-topbar .ds-info .name { font-family:var(--font-display); font-size:1rem; font-weight:700; }
+.editor-topbar .ds-info .meta { font-size:.76rem; color:var(--slate); }
+.table-editor-wrap {
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  overflow:hidden;
+}
+.table-editor {
+  width:100%; border-collapse:collapse; font-size:.82rem;
+}
+.table-editor thead { position:sticky; top:0; z-index:10; }
+.table-editor thead th {
+  background:var(--canvas); border-bottom:2px solid var(--border); padding:10px 14px;
+  font-family:var(--font-display); font-size:.78rem; font-weight:700; white-space:nowrap;
+  color:var(--ink);
+}
+[data-bs-theme="dark"] .table-editor thead th { background:#0D1626; }
+.table-editor tbody td { border-bottom:1px solid var(--border); padding:0; vertical-align:middle; }
+.table-editor tbody tr:last-child td { border-bottom:none; }
+.table-editor tbody tr:hover td { background:rgba(59, 90, 120, .04); }
+[data-bs-theme="dark"] .table-editor tbody tr:hover td { background:rgba(59, 90, 120, .07); }
+.cell-input {
+  width:100%; border:none; background:transparent; padding:8px 14px;
+  font-size:.82rem; color:inherit; font-family:var(--font-body); outline:none;
+  min-width:100px;
+}
+.cell-input:focus { background:rgba(59, 90, 120, .06); }
+[data-bs-theme="dark"] .cell-input { color:#E7ECF7; }
+[data-bs-theme="dark"] .cell-input:focus { background:rgba(59, 90, 120, .12); }
+.row-num { width:40px; text-align:center; color:var(--slate-light); font-size:.72rem; font-family:var(--font-mono); border-right:1px solid var(--border); }
+.row-del { width:36px; text-align:center; }
+.del-row-btn { background:none; border:none; color:var(--coral); cursor:pointer; padding:4px 6px; border-radius:6px; opacity:.6; }
+.del-row-btn:hover { opacity:1; background:rgba(239,68,68,.08); }
+.add-row-btn { background:none; border:none; color:var(--teal); cursor:pointer; font-size:.82rem; padding:8px 14px; font-weight:600; width:100%; text-align:left; border-top:1px solid var(--border); }
+.add-row-btn:hover { background:rgba(59, 90, 120, .05); }
+.change-banner { background:rgba(245,158,11,.09); border:1px solid rgba(245,158,11,.25); border-radius:10px; padding:10px 16px; font-size:.82rem; color:#92400E; display:flex; align-items:center; gap:10px; }
+[data-bs-theme="dark"] .change-banner { background:rgba(245,158,11,.1); color:#FCD34D; }
+.access-badge { background:rgba(16,185,129,.1); color:#10B981; border:1px solid rgba(16,185,129,.25); border-radius:20px; padding:3px 12px; font-size:.72rem; font-weight:700; }
+.col-add-btn { background:rgba(59, 90, 120, .08); border:1px solid rgba(59, 90, 120, .2); color:var(--teal); border-radius:8px; padding:4px 12px; font-size:.76rem; font-weight:600; cursor:pointer; }
+.col-add-btn:hover { background:rgba(59, 90, 120, .15); }
+/* Scrollable grid */
+.table-scroll { overflow:auto; max-height:calc(100vh - 300px); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="editor-wrap">
+
+  {% if is_locked %}
+  <div class="change-banner" style="background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.25); color:#B91C1C;">
+    <i class="bi bi-lock-fill"></i>
+    <span>This dataset is <strong>locked</strong> by the admin. You can view it, but changes are disabled until it's unlocked.</span>
+  </div>
+  {% endif %}
+
+  <!-- Top bar -->
+  <div class="editor-topbar">
+    <div class="ds-info">
+      <div class="name"><i class="bi bi-table me-2 text-teal"></i>{{ dataset['name'] }}</div>
+      <div class="meta">
+        {% if is_locked %}
+          <span class="access-badge me-2" style="background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.25);"><i class="bi bi-lock-fill me-1"></i>Locked — Read Only</span>
+        {% else %}
+          <span class="access-badge me-2"><i class="bi bi-check-circle-fill me-1"></i>Edit Access Granted</span>
+        {% endif %}
+        {{ rows|length }} rows · {{ headers|length }} columns
+        {% if dataset['source_type'] == 'admin' %}
+          · <span class="text-muted">Admin dataset</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if not is_locked %}
+      <button class="btn btn-light btn-sm px-3" onclick="addRow()"><i class="bi bi-plus-lg me-1"></i>Add Row</button>
+      <button class="btn btn-light btn-sm px-3" data-bs-toggle="modal" data-bs-target="#addColModal"><i class="bi bi-layout-three-columns me-1"></i>Add Column</button>
+      <button class="btn btn-brand btn-sm px-3" onclick="saveData()"><i class="bi bi-floppy me-1"></i>Save Changes</button>
+      {% endif %}
+      <a href="{{ url_for('user_dataset_selection') }}" class="btn btn-light btn-sm px-3"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    </div>
+  </div>
+
+  <!-- Unsaved changes banner (hidden initially) -->
+  <div class="change-banner d-none" id="changeBanner">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span>You have unsaved changes — click <strong>Save Changes</strong> to persist them.</span>
+    <button class="btn btn-sm btn-warning ms-auto text-dark" onclick="saveData()"><i class="bi bi-floppy me-1"></i>Save</button>
+  </div>
+
+  <!-- Table editor -->
+  <div class="table-editor-wrap">
+    <div class="table-scroll">
+      <table class="table-editor" id="editorTable">
+        <thead>
+          <tr>
+            <th class="row-num">#</th>
+            {% for h in headers %}
+            <th>
+              <div class="d-flex align-items-center gap-1">
+                <span contenteditable="{{ 'false' if is_locked else 'true' }}" class="col-header-edit" data-col="{{ loop.index0 }}"
+                      style="outline:none; min-width:60px; border-radius:4px; padding:1px 4px;"
+                      title="{{ 'Locked' if is_locked else 'Click to rename column' }}">{{ h }}</span>
+              </div>
+            </th>
+            {% endfor %}
+            <th class="row-del"></th>
+          </tr>
+        </thead>
+        <tbody id="editorBody">
+          {% for row in rows %}
+          <tr data-row="{{ loop.index0 }}">
+            <td class="row-num">{{ loop.index }}</td>
+            {% for h in headers %}
+            <td><input class="cell-input" type="text" value="{{ row.get(h, '') }}" data-col="{{ loop.index0 }}" data-colname="{{ h }}" oninput="markDirty()" {{ 'readonly' if is_locked else '' }}></td>
+            {% endfor %}
+            <td class="row-del">{% if not is_locked %}<button class="del-row-btn" onclick="deleteRow(this)" title="Delete row"><i class="bi bi-trash3"></i></button>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if not is_locked %}
+    <button class="add-row-btn" onclick="addRow()"><i class="bi bi-plus-lg me-1"></i>Add new row</button>
+    {% endif %}
+  </div>
+
+  <!-- Save form (hidden, submitted programmatically) -->
+  <form id="saveForm" action="{{ url_for('user_save_dataset', dataset_id=dataset['id']) }}" method="POST">
+    <input type="hidden" name="csv_data" id="csvDataInput">
+    <input type="hidden" name="dataset_type" value="{{ dataset['source_type'] }}">
+  </form>
+
+</div>
+
+<!-- Add Column Modal -->
+<div class="modal fade" id="addColModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:16px;border:none;">
+      <div class="modal-header border-0">
+        <h5 class="modal-title"><i class="bi bi-layout-three-columns me-2 text-teal"></i>Add Column</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small fw-semibold">Column Name</label>
+        <input type="text" id="newColName" class="form-control" placeholder="e.g. Status, Score, Category">
+        <div class="form-text mt-1">A new empty column will be added to all rows.</div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-brand px-4" onclick="addColumn()">Add Column</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let dirty = false;
+let colHeaders = {{ headers | tojson }};
+
+function markDirty(){
+  dirty = true;
+  document.getElementById('changeBanner').classList.remove('d-none');
+}
+
+// ── Rename column header ──────────────────────────────
+document.querySelectorAll('.col-header-edit').forEach(el => {
+  el.addEventListener('input', () => markDirty());
+  el.addEventListener('blur', () => {
+    const idx = parseInt(el.dataset.col);
+    const newName = el.textContent.trim();
+    if(newName) colHeaders[idx] = newName;
+    // Update all data-colname attributes in this column
+    document.querySelectorAll(`td input[data-col="${idx}"]`).forEach(inp => {
+      inp.dataset.colname = newName;
+    });
+  });
+});
+
+// ── Add row ───────────────────────────────────────────
+function addRow(){
+  const tbody = document.getElementById('editorBody');
+  const rows  = tbody.querySelectorAll('tr');
+  const idx   = rows.length;
+  const tr    = document.createElement('tr');
+  tr.dataset.row = idx;
+  let cells = `<td class="row-num">${idx+1}</td>`;
+  colHeaders.forEach((h, ci) => {
+    cells += `<td><input class="cell-input" type="text" value="" data-col="${ci}" data-colname="${h}" oninput="markDirty()"></td>`;
+  });
+  cells += `<td class="row-del"><button class="del-row-btn" onclick="deleteRow(this)" title="Delete row"><i class="bi bi-trash3"></i></button></td>`;
+  tr.innerHTML = cells;
+  tbody.appendChild(tr);
+  markDirty();
+  tr.querySelector('.cell-input').focus();
+  renumberRows();
+}
+
+// ── Delete row ────────────────────────────────────────
+function deleteRow(btn){
+  if(!confirm('Delete this row?')) return;
+  btn.closest('tr').remove();
+  renumberRows();
+  markDirty();
+}
+
+function renumberRows(){
+  document.querySelectorAll('#editorBody tr').forEach((tr, i) => {
+    const num = tr.querySelector('.row-num');
+    if(num) num.textContent = i+1;
+    tr.dataset.row = i;
+  });
+}
+
+// ── Add column ────────────────────────────────────────
+function addColumn(){
+  const name = document.getElementById('newColName').value.trim();
+  if(!name){ alert('Please enter a column name.'); return; }
+  const ci = colHeaders.length;
+  colHeaders.push(name);
+
+  // Add header cell
+  const hrow = document.querySelector('#editorTable thead tr');
+  const delTh = hrow.querySelector('.row-del');
+  const th = document.createElement('th');
+  th.innerHTML = `<span contenteditable="true" class="col-header-edit" data-col="${ci}" style="outline:none;min-width:60px;border-radius:4px;padding:1px 4px;" title="Click to rename">${name}</span>`;
+  th.querySelector('.col-header-edit').addEventListener('input', () => markDirty());
+  th.querySelector('.col-header-edit').addEventListener('blur', function(){ colHeaders[ci] = this.textContent.trim(); });
+  hrow.insertBefore(th, delTh);
+
+  // Add cell to each data row
+  document.querySelectorAll('#editorBody tr').forEach(tr => {
+    const delTd = tr.querySelector('.row-del');
+    const td = document.createElement('td');
+    td.innerHTML = `<input class="cell-input" type="text" value="" data-col="${ci}" data-colname="${name}" oninput="markDirty()">`;
+    tr.insertBefore(td, delTd);
+  });
+
+  bootstrap.Modal.getInstance(document.getElementById('addColModal')).hide();
+  document.getElementById('newColName').value = '';
+  markDirty();
+}
+
+// ── Collect table → CSV and submit ───────────────────
+function saveData(){
+  // Get current headers (renamed or not)
+  const thEls = document.querySelectorAll('#editorTable thead .col-header-edit');
+  const currentHeaders = Array.from(thEls).map(el => el.textContent.trim());
+
+  const rows = [];
+  document.querySelectorAll('#editorBody tr').forEach(tr => {
+    const cells = tr.querySelectorAll('.cell-input');
+    if(!cells.length) return;
+    const row = {};
+    cells.forEach((inp, i) => {
+      row[currentHeaders[i] || inp.dataset.colname] = inp.value;
+    });
+    rows.push(row);
+  });
+
+  // Build CSV string
+  const escapeCSV = v => {
+    const s = String(v ?? '');
+    return (s.includes(',') || s.includes('"') || s.includes('\n'))
+      ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  let csv = currentHeaders.map(escapeCSV).join(',') + '\n';
+  rows.forEach(r => {
+    csv += currentHeaders.map(h => escapeCSV(r[h] ?? '')).join(',') + '\n';
+  });
+
+  document.getElementById('csvDataInput').value = csv;
+  document.getElementById('saveForm').submit();
+}
+
+// Warn before navigating away with unsaved changes
+window.addEventListener('beforeunload', e => {
+  if(dirty){ e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

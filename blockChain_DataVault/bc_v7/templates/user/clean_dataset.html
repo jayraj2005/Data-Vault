@@ -1,0 +1,87 @@
+{% extends "user/base_user.html" %}
+{% block title %}Clean Dataset{% endblock %}
+{% block page_title %}Clean Your Data{% endblock %}
+
+{% block extra_head %}
+<style>
+.no-ds-banner.dq-gate { max-width: 620px; margin: 40px auto; text-align: center; }
+.no-ds-banner.dq-gate i.bi-shield-exclamation { font-size: 2.6rem; display:block; margin-bottom: 10px; }
+.dq-gate-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; max-width:480px; margin:0 auto 6px; }
+.dq-gate-metric { background:var(--canvas); border:1px solid var(--border); border-radius:8px; padding:8px; text-align:center; }
+[data-bs-theme="dark"] .dq-gate-metric { background:#101828; }
+.dq-gate-metric strong { display:block; font-family:var(--font-mono); font-size:1.05rem; color:#EF4444; }
+.dq-gate-metric span { font-size:.62rem; color:var(--slate); text-transform:uppercase; letter-spacing:.03em; }
+.dq-download-row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+.dq-download-row a, .dq-download-row button { font-size:.82rem; }
+.ai-clean-success { background:rgba(59, 90, 120, .08); border:1px solid rgba(59, 90, 120, .25); border-radius:10px; padding:12px 14px; font-size:.85rem; }
+.ai-error-msg { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.25); border-radius:10px; padding:12px 14px; font-size:.85rem; color:#EF4444; }
+.ai-loading { display:flex; align-items:center; gap:10px; font-size:.85rem; color:var(--slate); justify-content:center; }
+.ai-loading .spinner-border { width:1.1rem; height:1.1rem; border-width:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="no-ds-banner dq-gate">
+  <i class="bi bi-shield-exclamation" style="color:#EF4444;"></i>
+  <h5 class="fw-bold mb-2">"{{ dataset_name }}" isn't clean yet</h5>
+  <p class="text-muted mb-1">
+    We scanned this dataset before letting you do anything else with it. Here's what needs fixing:
+  </p>
+  <div class="dq-gate-grid">
+    <div class="dq-gate-metric"><strong>{{ quality.missing_values }}</strong><span>Missing</span></div>
+    <div class="dq-gate-metric"><strong>{{ quality.duplicate_rows }}</strong><span>Duplicates</span></div>
+    <div class="dq-gate-metric"><strong>{{ quality.wrong_type_values }}</strong><span>Wrong Type</span></div>
+    <div class="dq-gate-metric"><strong>{{ quality.outlier_values }}</strong><span>Outliers</span></div>
+  </div>
+  <p class="text-muted mb-4" style="font-size:.82rem;">Data quality score: <strong>{{ quality.quality_score }}/100</strong></p>
+
+  <button class="btn btn-brand px-4" id="dqCleanBtn" onclick="dqCleanNow()">
+    <i class="bi bi-magic me-2"></i>Clean Dataset Automatically
+  </button>
+  <a href="{{ url_for('user_dashboard', type=dataset_type, id=selected_dataset_id) }}" class="d-block mt-3" style="font-size:.8rem;">
+    Skip cleaning and use the data as-is
+  </a>
+
+  <div id="dqCleanOutcome" class="mt-3"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function dqCleanNow(){
+  const btn = document.getElementById('dqCleanBtn');
+  const out = document.getElementById('dqCleanOutcome');
+  btn.disabled = true;
+  out.innerHTML = '<div class="ai-loading"><div class="spinner-border" role="status"></div>Cleaning dataset...</div>';
+  try{
+    const f = new FormData();
+    f.append('type', {{ dataset_type|tojson }});
+    f.append('id', {{ selected_dataset_id|tojson }});
+    const r = await fetch('/user/ai/clean', { method:'POST', body: f });
+    const data = await r.json();
+    if(!data.success){
+      out.innerHTML = '<div class="ai-error-msg"><i class="bi bi-exclamation-triangle me-1"></i>'+(data.message||'Could not clean the dataset.')+'</div>';
+      btn.disabled = false;
+      return;
+    }
+    const rep = data.report;
+    out.innerHTML =
+      '<div class="ai-clean-success">' +
+        '<i class="bi bi-check-circle-fill me-1" style="color:var(--teal);"></i>' +
+        'Cleaned ' + rep.duplicates_removed + ' duplicate(s), filled ' + rep.missing_filled +
+        ' missing value(s), fixed ' + rep.wrong_type_fixed + ' wrong-type value(s) and capped ' +
+        rep.outliers_capped + ' outlier(s).<br>Saved as <strong>' + data.new_dataset_name + '</strong>.' +
+      '</div>' +
+      '<div class="dq-download-row">' +
+        '<a class="btn btn-outline-secondary" href="' + data.download_url + '"><i class="bi bi-download me-1"></i>Download Cleaned Data</a>' +
+        '<a class="btn btn-brand" href="' + data.dashboard_url + '"><i class="bi bi-speedometer2 me-1"></i>Go to Dashboard</a>' +
+        '<a class="btn btn-outline-secondary" href="' + data.redirect_url + '"><i class="bi bi-bar-chart me-1"></i>Visualize It</a>' +
+      '</div>';
+    btn.style.display = 'none';
+  }catch(e){
+    out.innerHTML = '<div class="ai-error-msg"><i class="bi bi-exclamation-triangle me-1"></i>Could not reach the cleaning engine.</div>';
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

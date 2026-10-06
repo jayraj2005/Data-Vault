@@ -1,0 +1,59 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}History{% endblock %}
+{% block page_title %}Activity History{% endblock %}
+
+{% block content %}
+
+<div class="panel-card">
+  <div class="panel-head">
+    <h5>Admin Activity Log</h5>
+    <span class="text-muted small">{{ history|length }} entries</span>
+  </div>
+
+  {% if history %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Actor</th>
+          <th>Action</th>
+          <th>Details</th>
+          <th>Date / Time</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td class="fw-semibold">{{ h['actor_name'] }}</td>
+          <td>{{ h['action'] }}</td>
+          <td class="text-muted">{{ h['details'] or '—' }}</td>
+          <td class="text-muted">{{ h['created_at'] }}</td>
+          <td class="text-end">
+            {% if h['action'] in ('Logged in', 'Logged out') %}
+              <span class="btn-action" style="opacity: 0.4; cursor: not-allowed;" title="Login records can't be deleted">
+                <i class="bi bi-lock"></i>
+              </span>
+            {% else %}
+              <form action="{{ url_for('admin_delete_history', history_id=h['id']) }}" method="POST"
+                    class="d-inline" data-confirm="Delete this history entry?">
+                <button type="submit" class="btn-action delete" title="Delete entry">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clock-history"></i>
+    No activity recorded yet.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

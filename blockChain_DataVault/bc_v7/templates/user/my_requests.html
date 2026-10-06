@@ -1,0 +1,92 @@
+{% extends "user/base_user.html" %}
+{% block title %}My Requests{% endblock %}
+{% block page_title %}My Requests{% endblock %}
+
+{% block content %}
+
+<div class="panel-card">
+  <div class="panel-head">
+    <h5><i class="bi bi-clipboard-check me-2"></i>My Edit Access Requests</h5>
+    <a href="{{ url_for('user_dataset_selection') }}#tab-admin" class="btn btn-brand btn-sm px-3">
+      <i class="bi bi-plus-lg me-1"></i>New Request
+    </a>
+  </div>
+
+  {% if requests %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Dataset</th>
+          <th>Reason</th>
+          <th>Requested On</th>
+          <th>Status</th>
+          <th>Updated</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td class="fw-semibold">{{ r['dataset_name'] }}</td>
+          <td class="text-muted small" style="max-width:240px;">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r['requested_change'] }}">
+              {{ r['requested_change'] }}
+            </div>
+          </td>
+          <td class="text-muted small">{{ r['created_at'][:10] }}</td>
+          <td>
+            {% if r['status'] == 'Pending' %}
+              <span class="status-pill pending"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+            {% elif r['status'] == 'Approved' %}
+              <span class="status-pill approved"><i class="bi bi-check-circle-fill me-1"></i>Approved</span>
+            {% else %}
+              <span class="status-pill rejected"><i class="bi bi-x-circle-fill me-1"></i>Rejected</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ r['updated_at'][:10] if r['updated_at'] else '—' }}</td>
+          <td class="text-end">
+            {% if r['status'] == 'Approved' %}
+              <a href="{{ url_for('user_edit_dataset_page', dataset_id=r['dataset_id']) }}"
+                 class="btn btn-sm btn-brand px-3">
+                <i class="bi bi-pencil me-1"></i>Edit Dataset
+              </a>
+              {% if r['dataset_locked'] %}
+                <span class="status-pill locked ms-1"><i class="bi bi-lock-fill"></i> Locked</span>
+              {% endif %}
+            {% elif r['status'] == 'Pending' %}
+              <span class="text-muted small">Waiting for admin</span>
+            {% else %}
+              <span class="text-muted small">Access denied</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clipboard-check"></i>
+    No requests yet. Go to <a href="{{ url_for('user_dataset_selection') }}" class="text-teal">Admin Datasets</a>
+    tab and click <strong>Request Edit</strong> on any dataset.
+  </div>
+  {% endif %}
+</div>
+
+<div class="panel-card mt-3" style="background:rgba(59, 90, 120, .05);border-color:rgba(59, 90, 120, .2);">
+  <div class="p-4">
+    <div class="fw-semibold mb-1"><i class="bi bi-info-circle-fill text-teal me-2"></i>How Edit Access Works</div>
+    <div class="text-muted small">
+      <ol class="mb-0 ps-3" style="line-height:1.9;">
+        <li>Go to <strong>Dataset Selection → Admin Datasets</strong> and click <strong>Request Edit</strong>.</li>
+        <li>Describe your reason — the admin will review it.</li>
+        <li>Once <strong>Approved</strong>, you can open the dataset editor directly from this page or from the Admin Datasets tab.</li>
+        <li>All your edits are saved back to the file and the admin is notified. Every save is recorded on the blockchain.</li>
+        <li>The admin can <strong>lock</strong> a dataset at any time — once locked, you can still view it but can't make further changes until it's unlocked again.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

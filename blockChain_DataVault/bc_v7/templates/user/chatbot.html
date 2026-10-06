@@ -1,0 +1,602 @@
+{% extends "user/base_user.html" %}
+{% block title %}AI Chatbot{% endblock %}
+{% block page_title %}AI Chatbot{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+/* ── Layout ─────────────────────────────────── */
+.chat-wrap {
+  display: grid; grid-template-columns: 260px 1fr; gap: 16px;
+  height: calc(100vh - 148px); min-height: 520px;
+}
+@media(max-width:768px){ .chat-wrap{ grid-template-columns:1fr; height:auto; } }
+
+/* ── Sidebar ─────────────────────────────────── */
+.chat-sidebar {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); display:flex; flex-direction:column; overflow:hidden;
+}
+.chat-sb-head { padding:14px 16px; border-bottom:1px solid var(--border); }
+.chat-sb-head h6 { font-family:var(--font-display); font-size:.86rem; margin:0 0 10px; }
+.new-chat-btn {
+  width:100%; background:var(--teal); color:#fff; border:none;
+  border-radius:8px; padding:8px; font-size:.82rem; font-weight:600; cursor:pointer;
+}
+.new-chat-btn:hover { background:var(--teal-light); }
+.ch-list { flex:1; overflow-y:auto; padding:6px; }
+.ch-item {
+  border-radius:8px; padding:9px 11px; cursor:pointer; margin-bottom:3px;
+  transition:background .15s; display:flex; align-items:flex-start; gap:8px;
+}
+.ch-item:hover { background:var(--canvas); }
+.ch-item.active { background:rgba(59, 90, 120, .1); }
+.ch-item .ci-icon {
+  width:28px; height:28px; border-radius:7px; background:rgba(59, 90, 120, .12);
+  color:var(--teal); display:flex; align-items:center; justify-content:center;
+  font-size:.8rem; flex-shrink:0; margin-top:2px;
+}
+.ch-item .ci-title { font-size:.78rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ch-item .ci-date  { font-size:.67rem; color:var(--slate); margin-top:2px; }
+.del-all-btn {
+  width:100%; border:none; background:none; color:var(--coral);
+  font-size:.76rem; padding:8px; cursor:pointer; border-top:1px solid var(--border);
+}
+.del-all-btn:hover { background:rgba(239,68,68,.06); }
+
+/* ── Main chat ───────────────────────────────── */
+.chat-main {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); display:flex; flex-direction:column; overflow:hidden;
+}
+.chat-header {
+  padding:14px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.chat-messages {
+  flex:1; overflow-y:auto; padding:18px;
+  display:flex; flex-direction:column; gap:14px; background:var(--canvas);
+}
+[data-bs-theme="dark"] .chat-messages { background:#0B1220; }
+
+/* ── Bubbles ─────────────────────────────────── */
+.msg { display:flex; gap:8px; max-width:88%; }
+.msg.user { flex-direction:row-reverse; align-self:flex-end; }
+.msg.ai   { align-self:flex-start; max-width:94%; }
+.msg-av {
+  width:30px; height:30px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:.75rem; font-weight:700; flex-shrink:0;
+}
+.msg.ai .msg-av   { background:linear-gradient(135deg,var(--teal),var(--ink-soft)); color:#fff; }
+.msg.user .msg-av { background:var(--ink-soft); color:#fff; }
+.msg-bbl {
+  border-radius:14px; padding:11px 15px; font-size:.86rem; line-height:1.6;
+}
+.msg.user .msg-bbl {
+  background:var(--teal); color:#fff; border-bottom-right-radius:4px;
+}
+.msg.ai .msg-bbl {
+  background:var(--card); border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+}
+[data-bs-theme="dark"] .msg.ai .msg-bbl { background:#141C2E; }
+
+/* Markdown-ish styling inside AI bubbles */
+.msg-bbl strong { font-weight:700; }
+.msg-bbl code {
+  background:rgba(59, 90, 120, .10); color:var(--teal);
+  border-radius:4px; padding:1px 5px; font-size:.82rem;
+  font-family:var(--font-mono);
+}
+[data-bs-theme="dark"] .msg-bbl code { background:rgba(59, 90, 120, .18); }
+.msg-bbl table {
+  border-collapse:collapse; width:100%; margin-top:8px; font-size:.78rem;
+}
+.msg-bbl th { background:rgba(59, 90, 120, .1); padding:5px 9px; text-align:left; font-weight:600; }
+.msg-bbl td { padding:4px 9px; border-top:1px solid var(--border); }
+[data-bs-theme="dark"] .msg-bbl th { background:rgba(59, 90, 120, .2); }
+
+/* ── Inline chart bubble ─────────────────────── */
+.chart-bubble {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; border-bottom-left-radius:4px;
+  padding:16px; margin-top:0; max-width:520px;
+}
+[data-bs-theme="dark"] .chart-bubble { background:#141C2E; }
+.chart-bubble .chart-title {
+  font-size:.78rem; font-weight:700; color:var(--slate);
+  margin-bottom:10px; display:flex; align-items:center; gap:6px;
+}
+.chart-bubble .chart-type-badge {
+  background:rgba(59, 90, 120, .1); color:var(--teal);
+  border-radius:20px; padding:2px 8px; font-size:.68rem; font-weight:600;
+}
+
+/* ── Typing indicator ────────────────────────── */
+.typing-dots span {
+  display:inline-block; width:6px; height:6px; border-radius:50%;
+  background:var(--teal); animation:blink 1.2s infinite; margin:0 2px;
+}
+.typing-dots span:nth-child(2){ animation-delay:.2s; }
+.typing-dots span:nth-child(3){ animation-delay:.4s; }
+@keyframes blink{ 0%,60%,100%{opacity:.2;} 30%{opacity:1;} }
+
+/* ── Quick prompts ───────────────────────────── */
+.qp-scroll { overflow-x:auto; padding:10px 12px 6px; border-top:1px solid var(--border); }
+.qp-row { display:flex; gap:6px; flex-nowrap; width:max-content; }
+.qp-btn {
+  background:var(--canvas); border:1px solid var(--border);
+  border-radius:20px; padding:5px 12px; font-size:.74rem;
+  cursor:pointer; white-space:nowrap; transition:all .15s; color:inherit;
+}
+.qp-btn:hover { border-color:var(--teal); color:var(--teal); background:rgba(59, 90, 120, .06); }
+[data-bs-theme="dark"] .qp-btn { background:#101828; }
+
+/* ── Input area ──────────────────────────────── */
+.chat-input-row { padding:10px 14px 12px; border-top:1px solid var(--border); flex-shrink:0; }
+.chat-input-box {
+  display:flex; gap:8px; background:var(--canvas);
+  border:1px solid var(--border); border-radius:12px; padding:8px 12px;
+  transition:border-color .15s;
+}
+.chat-input-box:focus-within { border-color:var(--teal); }
+[data-bs-theme="dark"] .chat-input-box { background:#101828; }
+.chat-ta {
+  flex:1; border:none; background:transparent; font-size:.86rem;
+  outline:none; color:inherit; resize:none; max-height:90px; font-family:var(--font-body);
+}
+.chat-send {
+  background:var(--teal); color:#fff; border:none; border-radius:8px;
+  width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; align-self:flex-end; flex-shrink:0; transition:background .15s;
+}
+.chat-send:hover { background:var(--teal-light); }
+.chat-send:disabled { background:var(--slate-light); cursor:not-allowed; }
+
+/* ── No-dataset CTA ──────────────────────────── */
+.no-ds-cta {
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:center; flex:1; text-align:center; padding:40px;
+}
+.no-ds-cta i { font-size:2.8rem; color:var(--teal); opacity:.5; margin-bottom:14px; }
+
+/* ── Chart type pills (in suggestions) ──────── */
+.chart-pill {
+  display:inline-flex; align-items:center; gap:4px;
+  background:rgba(59, 90, 120, .1); color:#3B5A78;
+  border:1px solid rgba(59, 90, 120, .25); border-radius:20px;
+  padding:3px 10px; font-size:.72rem; font-weight:600;
+  cursor:pointer; transition:all .15s;
+}
+.chart-pill:hover { background:rgba(59, 90, 120, .18); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="chat-wrap">
+
+  <!-- ── Sidebar ──────────────────────────────── -->
+  <div class="chat-sidebar">
+    <div class="chat-sb-head">
+      <h6><i class="bi bi-chat-dots me-1"></i>Conversations</h6>
+      <form action="{{ url_for('user_new_chat') }}" method="POST">
+        {% if selected_dataset_id %}
+          <input type="hidden" name="ds_type" value="{{ dataset_type }}">
+          <input type="hidden" name="ds_id" value="{{ selected_dataset_id }}">
+        {% endif %}
+        <button type="submit" class="new-chat-btn">
+          <i class="bi bi-plus-lg me-1"></i>New Chat
+        </button>
+      </form>
+    </div>
+    <div class="ch-list">
+      {% if chat_sessions %}
+        {% for s in chat_sessions %}
+        <div class="ch-item {{ 'active' if active_session and active_session['id']==s['id'] }}"
+             onclick="location.href='{{ url_for('user_chatbot_session', session_id=s['id']) }}'">
+          <div class="ci-icon"><i class="bi bi-chat-left-text"></i></div>
+          <div style="min-width:0;">
+            <div class="ci-title">{{ s['title'] or ('Chat ' ~ s['id']|string) }}</div>
+            <div class="ci-date">{{ s['created_at'][:16] }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-center text-muted small p-4">No chats yet.<br>Start a new conversation!</div>
+      {% endif %}
+    </div>
+    {% if chat_sessions %}
+    <button class="del-all-btn" data-bs-toggle="modal" data-bs-target="#delAllModal">
+      <i class="bi bi-trash3 me-1"></i>Delete All History
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- ── Main Chat ─────────────────────────────── -->
+  <div class="chat-main">
+    {% if active_session %}
+
+    <div class="chat-header">
+      <div>
+        <div class="fw-semibold" style="font-size:.9rem;">{{ active_session['title'] or 'New Chat' }}</div>
+        {% if dataset_name %}
+          <div class="text-muted" style="font-size:.74rem;">
+            <i class="bi bi-database me-1"></i>{{ dataset_name }} · {{ rows|length }} rows · {{ headers|length }} cols
+          </div>
+        {% endif %}
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        {% if dataset_name %}
+          <span class="status-pill approved" style="font-size:.68rem;">
+            <i class="bi bi-lightning-fill me-1"></i>AI + Charts
+          </span>
+          <a href="{{ url_for('user_visualize', type=dataset_type, id=selected_dataset_id) }}"
+             class="btn btn-brand" style="font-size:.76rem; padding:5px 12px;">
+            <i class="bi bi-graph-up me-1"></i>Visualize
+          </a>
+        {% endif %}
+        <form action="{{ url_for('user_delete_chat_session', session_id=active_session['id']) }}"
+              method="POST" onsubmit="return confirm('Delete this chat?')">
+          <button type="submit" class="btn-action delete" title="Delete chat">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMsgs">
+      <!-- Welcome bubble -->
+      <div class="msg ai">
+        <div class="msg-av"><i class="bi bi-robot"></i></div>
+        <div class="msg-bbl">
+          {% if dataset_name %}
+            <strong>Hi! I've loaded {{ dataset_name }}</strong> — {{ rows|length }} rows, {{ headers|length }} columns.<br>
+            <span style="font-size:.8rem; color:var(--slate);">
+              Columns: <code>{{ headers[:6]|join(', ') }}{% if headers|length > 6 %} …+{{ headers|length - 6 }} more{% endif %}</code>
+            </span><br><br>
+            Ask me anything: summaries, stats, charts, patterns or questions about specific columns.
+            <br><br>
+            <span style="font-size:.78rem; color:var(--slate);">
+              💡 Try: <em>"show me a bar chart of…"</em> or <em>"plot the top 5 values in…"</em>
+            </span>
+          {% else %}
+            Hi! I'm your AI data assistant.
+            <a href="{{ url_for('user_dataset_selection') }}">Select a dataset</a> to get started.
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Previous messages -->
+      {% for m in messages %}
+      <div class="msg {{ 'user' if m['role']=='user' else 'ai' }}" id="msg-{{ loop.index }}">
+        {% if m['role']=='user' %}
+          <div class="msg-bbl">{{ m['content'] }}</div>
+          <div class="msg-av">{{ logged_in_name[:1] if logged_in_name else 'U' }}</div>
+        {% else %}
+          <div class="msg-av"><i class="bi bi-robot"></i></div>
+          <div>
+            <div class="msg-bbl" id="bubble-{{ loop.index }}"></div>
+            <div id="chart-{{ loop.index }}"></div>
+          </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <!-- Typing indicator -->
+      <div id="typingDiv" class="msg ai d-none">
+        <div class="msg-av"><i class="bi bi-robot"></i></div>
+        <div class="msg-bbl">
+          <span class="typing-dots"><span></span><span></span><span></span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick prompts -->
+    {% if dataset_name %}
+    <div class="qp-scroll">
+      <div class="qp-row">
+        <button class="qp-btn" onclick="setQ('Summarize this dataset')">📊 Summary</button>
+        <button class="qp-btn" onclick="setQ('What are the key insights?')">💡 Insights</button>
+        <button class="qp-btn" onclick="setQ('Show a bar chart')">📊 Bar Chart</button>
+        <button class="qp-btn" onclick="setQ('Show a pie chart')">🥧 Pie Chart</button>
+        <button class="qp-btn" onclick="setQ('Show a line chart')">📈 Line Chart</button>
+        <button class="qp-btn" onclick="setQ('Show column statistics')">🔢 Stats</button>
+        <button class="qp-btn" onclick="setQ('Are there any missing values?')">❓ Missing</button>
+        <button class="qp-btn" onclick="setQ('Preview first 5 rows')">👁 Preview</button>
+        <button class="qp-btn" onclick="setQ('Compare numeric columns')">⚖ Compare</button>
+        <button class="qp-btn" onclick="setQ('Show top 10 values')">🏆 Top 10</button>
+        <button class="qp-btn" onclick="setQ('Show distribution')">📉 Distribution</button>
+        <button class="qp-btn" onclick="setQ('Show scatter plot')">✦ Scatter</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="chat-input-row">
+      <div class="chat-input-box">
+        <textarea class="chat-ta" id="chatInput" rows="1"
+          placeholder="{% if dataset_name %}Ask about {{ dataset_name }}, or say 'show bar chart of X'…{% else %}Select a dataset first…{% endif %}"
+          {% if not dataset_name %}disabled{% endif %}></textarea>
+        <button class="chat-send" id="sendBtn" {% if not dataset_name %}disabled{% endif %}>
+          <i class="bi bi-send-fill"></i>
+        </button>
+      </div>
+      {% if dataset_name %}
+      <div class="mt-1 px-1" style="font-size:.72rem; color:var(--slate-light);">
+        <i class="bi bi-bar-chart me-1"></i>Say "show bar chart", "pie chart", "line chart", "scatter plot", or "histogram" to get a graph
+      </div>
+      {% endif %}
+    </div>
+
+    {% else %}
+    <div class="no-ds-cta">
+      <i class="bi bi-robot"></i>
+      <div class="fw-semibold mb-2">AI Dataset Assistant</div>
+      <p class="text-muted small mb-4">
+        {% if dataset_name %}
+          Dataset loaded: <strong>{{ dataset_name }}</strong>. Start a new chat to ask questions.
+        {% else %}
+          Select a dataset then start a new chat to get AI-powered insights and charts.
+        {% endif %}
+      </p>
+      <form action="{{ url_for('user_new_chat') }}" method="POST">
+        {% if selected_dataset_id %}
+          <input type="hidden" name="ds_type" value="{{ dataset_type }}">
+          <input type="hidden" name="ds_id" value="{{ selected_dataset_id }}">
+        {% endif %}
+        <button type="submit" class="btn btn-brand px-4">
+          <i class="bi bi-plus-lg me-2"></i>Start New Chat
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Delete All Modal -->
+<div class="modal fade" id="delAllModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:16px;border:none;">
+      <div class="modal-body text-center p-4">
+        <i class="bi bi-trash3-fill text-danger" style="font-size:2.2rem;"></i>
+        <h5 class="mt-3 mb-1">Delete All Chat History?</h5>
+        <p class="text-muted small mb-4">All sessions and messages will be permanently removed.</p>
+        <form action="{{ url_for('user_delete_all_chat_sessions') }}" method="POST" class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger px-4">Delete All</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pass data to JS -->
+<script id="dvChatData" type="application/json">
+{{ {"headers": headers, "rows": rows, "dataset_name": dataset_name,
+    "session_id": active_session['id'] if active_session else none,
+    "dataset_type": dataset_type, "dataset_id": selected_dataset_id,
+    "prev_messages": messages | map(attribute='content') | list,
+    "prev_roles": messages | map(attribute='role') | list } | tojson }}
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function(){
+  const cd  = JSON.parse(document.getElementById('dvChatData').textContent);
+  const msgs = document.getElementById('chatMsgs');
+  const inp  = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const gridC = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+  const textC = isDark ? '#9AAAC4' : '#64748B';
+
+  if(msgs) msgs.scrollTop = msgs.scrollHeight;
+
+  // ── Render previous AI messages (markdown + charts) ──────
+  if(cd.prev_messages){
+    cd.prev_messages.forEach(function(content, i){
+      const role = cd.prev_roles[i];
+      if(role !== 'assistant') return;
+      const idx = i + 1;
+      const bubbleEl = document.getElementById('bubble-' + idx);
+      const chartEl  = document.getElementById('chart-' + idx);
+      if(bubbleEl){
+        try {
+          const parsed = JSON.parse(content);
+          if(parsed && parsed.__type === 'chart'){
+            bubbleEl.innerHTML = renderMarkdown(parsed.text || '');
+            renderChartBubble(chartEl, parsed, 'prev-' + idx);
+          } else {
+            bubbleEl.innerHTML = renderMarkdown(content);
+          }
+        } catch(e){
+          bubbleEl.innerHTML = renderMarkdown(content);
+        }
+      }
+    });
+  }
+
+  // ── Auto-resize textarea ──────────────────────────────────
+  if(inp){
+    inp.addEventListener('input', function(){
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 90) + 'px';
+    });
+    inp.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); doSend(); }
+    });
+  }
+  if(sendBtn) sendBtn.addEventListener('click', doSend);
+
+  function setQ(q){ if(inp){ inp.value=q; inp.focus(); inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,90)+'px'; } }
+  window.setQ = setQ;
+
+  // ── Simple markdown renderer ──────────────────────────────
+  function renderMarkdown(text){
+    if(!text) return '';
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/^• (.+)/gm, '<span style="display:block;padding-left:10px;">• $1</span>')
+      .replace(/^(\| .+)+/gm, function(table){
+        const lines = table.trim().split('\n').filter(l=>l.trim()&&!l.match(/^\|[\s\-:]+\|/));
+        if(!lines.length) return table;
+        let html = '<div style="overflow-x:auto;margin-top:8px;"><table>';
+        lines.forEach(function(line, li){
+          const cells = line.split('|').filter(c=>c.trim()!=='');
+          const tag = li===0 ? 'th' : 'td';
+          html += '<tr>' + cells.map(c=>`<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+        });
+        return html + '</table></div>';
+      })
+      .replace(/\n/g, '<br>');
+  }
+
+  // ── Chart rendering ───────────────────────────────────────
+  const PALETTE = [
+    'rgba(59, 90, 120, .8)','rgba(100, 116, 139, .8)','rgba(245,158,11,.8)',
+    'rgba(220,38,38,.8)','rgba(6,182,212,.8)','rgba(236,72,153,.8)',
+    'rgba(16,185,129,.8)','rgba(249,115,22,.8)','rgba(99,102,241,.8)',
+    'rgba(132,204,22,.8)','rgba(234,179,8,.8)','rgba(59,130,246,.8)',
+  ];
+
+  function renderChartBubble(container, chartData, uid){
+    if(!container || !chartData) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'chart-bubble';
+    wrap.style.marginTop = '8px';
+
+    const title = document.createElement('div');
+    title.className = 'chart-title';
+    title.innerHTML = `<i class="bi bi-bar-chart-line"></i>${chartData.title || 'Chart'} <span class="chart-type-badge">${chartData.chartType || 'bar'}</span>`;
+    wrap.appendChild(title);
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'chart-canvas-' + uid;
+    canvas.height = 220;
+    wrap.appendChild(canvas);
+    container.appendChild(wrap);
+
+    Chart.defaults.color = textC;
+    Chart.defaults.borderColor = gridC;
+
+    const type = chartData.chartType || 'bar';
+    const labels = chartData.labels || [];
+    const values = chartData.values || [];
+
+    const baseDataset = {
+      label: chartData.valueLabel || 'Value',
+      data: values,
+      borderRadius: type === 'bar' ? 5 : 0,
+    };
+
+    if(type === 'pie' || type === 'doughnut'){
+      baseDataset.backgroundColor = PALETTE.slice(0, labels.length);
+      baseDataset.borderWidth = 0;
+    } else if(type === 'line' || type === 'area'){
+      baseDataset.borderColor = PALETTE[0];
+      baseDataset.backgroundColor = 'rgba(59, 90, 120, .12)';
+      baseDataset.tension = 0.4;
+      baseDataset.fill = true;
+      baseDataset.pointRadius = 4;
+      baseDataset.pointBackgroundColor = PALETTE[0];
+    } else if(type === 'scatter'){
+      baseDataset.backgroundColor = PALETTE[2];
+      baseDataset.pointRadius = 5;
+    } else {
+      baseDataset.backgroundColor = PALETTE.slice(0, labels.length).length > 1
+        ? PALETTE.slice(0, labels.length) : PALETTE[0];
+      baseDataset.borderSkipped = false;
+    }
+
+    const chartType = (type === 'area') ? 'line' : (type === 'histogram') ? 'bar' : type;
+    const chartCfg = {
+      type: chartType,
+      data: { labels, datasets: [baseDataset] },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: (type==='pie'||type==='doughnut'), position:'bottom', labels:{color:textC,boxWidth:12,padding:14} } },
+        scales: (type==='pie'||type==='doughnut') ? {} : {
+          x: { ticks:{color:textC,maxRotation:35}, grid:{color:gridC} },
+          y: { beginAtZero:true, ticks:{color:textC}, grid:{color:gridC} }
+        }
+      }
+    };
+    if(type==='doughnut') chartCfg.options.cutout = '55%';
+
+    new Chart(canvas, chartCfg);
+  }
+
+  // ── Append message bubble (text or chart) ─────────────────
+  let chartCounter = 0;
+  function appendMsg(role, content){
+    const d = document.createElement('div');
+    d.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+
+    if(role === 'user'){
+      d.innerHTML = `<div class="msg-bbl">${escHtml(content)}</div>
+        <div class="msg-av">${escHtml((cd.dataset_name||'')[0]||'U')}</div>`;
+    } else {
+      const bblId   = 'dyn-bubble-' + (++chartCounter);
+      const chartId = 'dyn-chart-'  + chartCounter;
+      d.innerHTML = `<div class="msg-av"><i class="bi bi-robot"></i></div>
+        <div><div class="msg-bbl" id="${bblId}"></div><div id="${chartId}"></div></div>`;
+      const typing = document.getElementById('typingDiv');
+      msgs.insertBefore(d, typing);
+      msgs.scrollTop = msgs.scrollHeight;
+
+      // Parse and render
+      try {
+        const parsed = JSON.parse(content);
+        if(parsed && parsed.__type === 'chart'){
+          document.getElementById(bblId).innerHTML = renderMarkdown(parsed.text || '');
+          renderChartBubble(document.getElementById(chartId), parsed, 'dyn-' + chartCounter);
+        } else {
+          document.getElementById(bblId).innerHTML = renderMarkdown(content);
+        }
+      } catch(e){
+        document.getElementById(bblId).innerHTML = renderMarkdown(content);
+      }
+      msgs.scrollTop = msgs.scrollHeight;
+      return;
+    }
+
+    const typing = document.getElementById('typingDiv');
+    msgs.insertBefore(d, typing);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function escHtml(t){ const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+  // ── Send message ──────────────────────────────────────────
+  async function doSend(){
+    const q = (inp.value || '').trim();
+    if(!q || !cd.session_id) return;
+    inp.value = ''; inp.style.height = 'auto';
+    appendMsg('user', q);
+
+    const typing = document.getElementById('typingDiv');
+    typing.classList.remove('d-none');
+    msgs.scrollTop = msgs.scrollHeight;
+    sendBtn.disabled = true;
+
+    try {
+      const body = new URLSearchParams({ question: q, session_id: cd.session_id });
+      const resp = await fetch('{{ url_for("user_chatbot_ask") }}', { method:'POST', body });
+      const data = await resp.json();
+      typing.classList.add('d-none');
+      // data.answer is either plain text or a JSON string with __type:'chart'
+      appendMsg('ai', data.answer || 'Sorry, I could not generate a response.');
+    } catch(e){
+      typing.classList.add('d-none');
+      appendMsg('ai', 'Sorry, there was an error. Please try again.');
+    } finally {
+      sendBtn.disabled = false;
+      inp.focus();
+    }
+  }
+})();
+</script>
+{% endblock %}

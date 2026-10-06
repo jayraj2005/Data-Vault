@@ -1,0 +1,16 @@
+OrderID,Product,Category,Price,Quantity,Date,Region
+1001,Laptop Pro,Electronics,1299.99,1,2024-01-15,North
+1002,Wireless Mouse,Electronics,29.99,3,2024-01-15,South
+1003,Office Chair,Furniture,349.99,2,2024-01-16,East
+1004,Standing Desk,Furniture,599.99,1,2024-01-16,West
+1005,USB Hub,Electronics,49.99,5,2024-01-17,North
+1006,Monitor 4K,Electronics,449.99,2,2024-01-17,South
+1007,Keyboard Mech,Electronics,129.99,4,2024-01-18,East
+1008,Bookshelf,Furniture,189.99,1,2024-01-18,West
+1009,Webcam HD,Electronics,79.99,6,2024-01-19,North
+1010,Desk Lamp,Furniture,59.99,8,2024-01-19,South
+1011,Headphones,Electronics,199.99,3,2024-01-20,East
+1012,Filing Cabinet,Furniture,249.99,2,2024-01-20,West
+1013,Tablet Pro,Electronics,799.99,1,2024-01-21,North
+1014,Plant Stand,Furniture,79.99,4,2024-01-21,South
+1015,Smart Speaker,Electronics,149.99,5,2024-01-22,East

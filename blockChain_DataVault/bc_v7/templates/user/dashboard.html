@@ -1,0 +1,353 @@
+{% extends "user/base_user.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+/* ── Dashboard-only extras ───────────────────────── */
+.summary-tbl .type-badge.num { background:var(--brand-muted); color:var(--brand); }
+.summary-tbl .type-badge.txt { background:var(--accent-muted); color:var(--accent-dim); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if not dataset_name %}
+<!-- ── No dataset ─────────────────────────────────── -->
+<div class="panel-card no-ds">
+  <i class="bi bi-bar-chart-line"></i>
+  <h5 class="mb-2">No Dataset Selected</h5>
+  <p class="text-muted mb-4">Go to Dataset Selection, pick any dataset and it will appear here instantly with full charts and analytics.</p>
+  <a href="{{ url_for('user_dataset_selection') }}" class="btn btn-brand px-4">
+    <i class="bi bi-collection me-2"></i>Select a Dataset
+  </a>
+</div>
+
+{% else %}
+<!-- ── Dataset info banner ──────────────────────────── -->
+<div class="dv-info-banner" id="globeHero">
+  <div class="dv-info-banner-body">
+    <span class="live-dot">Dataset Active</span>
+    <div class="hero-label">Data Intelligence</div>
+    <h2 class="hero-title">{{ dataset_name }}</h2>
+    <p class="hero-sub">{{ rows|length }} rows · {{ headers|length }} columns · Auto-generated insights</p>
+    <div class="d-flex gap-2 mt-3">
+      <a href="{{ url_for('user_dataset_selection') }}" class="btn btn-sm btn-outline-banner">
+        <i class="bi bi-arrow-repeat me-1"></i>Switch Dataset
+      </a>
+      <a href="{{ url_for('user_chatbot', type=dataset_type, id=selected_dataset_id) }}" class="btn btn-sm btn-outline-banner">
+        <i class="bi bi-robot me-1"></i>Ask AI
+      </a>
+    </div>
+  </div>
+  <div class="dv-hero-stats">
+    <div class="dv-hero-stat">
+      <span class="hs-val">{{ rows|length }}</span>
+      <span class="hs-lbl">Total rows</span>
+    </div>
+    <div class="dv-hero-stat">
+      <span class="hs-val">{{ headers|length }}</span>
+      <span class="hs-lbl">Columns</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── KPI Row ──────────────────────────────────── -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div><div class="kpi-val">{{ rows|length }}</div><div class="kpi-lbl">Total Rows</div></div>
+    <div class="kpi-icon" style="background:var(--brand);"><i class="bi bi-table"></i></div>
+  </div>
+  <div class="kpi-card">
+    <div><div class="kpi-val">{{ headers|length }}</div><div class="kpi-lbl">Columns</div></div>
+    <div class="kpi-icon" style="background:var(--accent-dim);"><i class="bi bi-layout-three-columns"></i></div>
+  </div>
+  <div class="kpi-card">
+    <div><div class="kpi-val" id="kpi-numeric">—</div><div class="kpi-lbl">Numeric Cols</div></div>
+    <div class="kpi-icon" style="background:#F59E0B;"><i class="bi bi-hash"></i></div>
+  </div>
+  <div class="kpi-card">
+    <div><div class="kpi-val" id="kpi-missing">—</div><div class="kpi-lbl">Missing Values</div></div>
+    <div class="kpi-icon" style="background:var(--danger);"><i class="bi bi-question-circle"></i></div>
+  </div>
+</div>
+
+<!-- ── Charts Grid (10 charts) ─────────────────── -->
+<div class="charts-grid mb-4">
+
+  <!-- 1. Bar: column completeness -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#3B5A78;"><i class="bi bi-bar-chart-fill"></i></span>Column Completeness</h6>
+    <canvas id="ch1" height="220"></canvas>
+  </div>
+
+  <!-- 2. Doughnut: column type ratio -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#3B5A78;"><i class="bi bi-pie-chart-fill"></i></span>Column Type Ratio</h6>
+    <canvas id="ch2" height="220"></canvas>
+  </div>
+
+  <!-- 3. Line: numeric averages -->
+  <div class="chart-card span2">
+    <h6><span class="ci" style="background:#F59E0B;"><i class="bi bi-graph-up"></i></span>Numeric Column Averages</h6>
+    <canvas id="ch3" height="140"></canvas>
+  </div>
+
+  <!-- 4. Horizontal bar: top value freq (first text col) -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#EF4444;"><i class="bi bi-bar-chart-steps"></i></span>Top Category Values</h6>
+    <canvas id="ch4" height="220"></canvas>
+  </div>
+
+  <!-- 5. Radar: numeric col normalized averages -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#2E4760;"><i class="bi bi-pentagon-fill"></i></span>Numeric Profile (Radar)</h6>
+    <canvas id="ch5" height="220"></canvas>
+  </div>
+
+  <!-- 6. Scatter: first 2 numeric cols -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#EC4899;"><i class="bi bi-diagram-3-fill"></i></span>Scatter Plot (2 Numeric)</h6>
+    <canvas id="ch6" height="220"></canvas>
+  </div>
+
+  <!-- 7. Stacked bar: missing vs present per column -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#10B981;"><i class="bi bi-bar-chart-line-fill"></i></span>Data Presence Stacked</h6>
+    <canvas id="ch7" height="220"></canvas>
+  </div>
+
+  <!-- 8. Bubble: row index vs first numeric col -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#F97316;"><i class="bi bi-circle-fill"></i></span>Value Distribution (Bubble)</h6>
+    <canvas id="ch8" height="220"></canvas>
+  </div>
+
+  <!-- 9. Polar area: numeric column std deviation -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#6366F1;"><i class="bi bi-bullseye"></i></span>Std Deviation (Polar)</h6>
+    <canvas id="ch9" height="220"></canvas>
+  </div>
+
+  <!-- 10. Area/line: running row count -->
+  <div class="chart-card">
+    <h6><span class="ci" style="background:#84CC16;"><i class="bi bi-activity"></i></span>Min vs Max per Column</h6>
+    <canvas id="ch10" height="220"></canvas>
+  </div>
+
+</div>
+
+<!-- ── Data Summary Table ──────────────────────── -->
+<div class="panel-card summary-tbl">
+  <div class="panel-head">
+    <h5><i class="bi bi-list-columns-reverse me-2"></i>Column Summary</h5>
+    <span class="text-muted small">First {{ [headers|length, 10]|min }} columns</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-clean mb-0" id="summaryTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Column</th><th>Type</th>
+          <th>Non-null</th><th>Unique</th><th>Min</th><th>Max</th><th>Average</th><th>Sample</th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody">
+        <tr><td colspan="9" class="text-center text-muted py-3"><i class="bi bi-arrow-clockwise me-1"></i>Computing…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+
+<!-- pass data to JS -->
+<script id="dvData" type="application/json">
+{{ {"headers": headers, "rows": rows} | tojson }}
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if dataset_name %}
+<script>
+(function(){
+  const raw = JSON.parse(document.getElementById('dvData').textContent);
+  const headers = raw.headers;
+  const rows = raw.rows;  // array of objects {col: val}
+  const n = rows.length;
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const gridC = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+  const textC = isDark ? '#9AAAC4' : '#64748B';
+
+  Chart.defaults.color = textC;
+  Chart.defaults.borderColor = gridC;
+
+  // ── Helpers ──────────────────────────────────────
+  function colVals(col){ return rows.map(r=>r[col]).filter(v=>v!==null&&v!==undefined&&String(v).trim()!==''); }
+  function numVals(col){ return colVals(col).map(v=>parseFloat(String(v).replace(',',''))).filter(v=>!isNaN(v)); }
+  function isNumeric(col){ const nv=numVals(col); return nv.length > colVals(col).length*0.6; }
+  function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
+  function stddev(arr){ const m=avg(arr); return Math.sqrt(avg(arr.map(x=>(x-m)**2))); }
+
+  const numCols = headers.filter(isNumeric);
+  const txtCols = headers.filter(h=>!isNumeric(h));
+
+  // KPIs
+  document.getElementById('kpi-numeric').textContent = numCols.length;
+  const missing = rows.reduce((t,r)=>t+headers.filter(h=>!r[h]||String(r[h]).trim()==='').length,0);
+  document.getElementById('kpi-missing').textContent = missing;
+
+  // ── Palette (kept varied — needed to tell chart series apart) ──
+  const P = [
+    'rgba(59, 90, 120, .8)','rgba(100, 116, 139, .8)','rgba(245,158,11,.8)',
+    'rgba(220,38,38,.8)','rgba(6,182,212,.8)','rgba(236,72,153,.8)',
+    'rgba(16,185,129,.8)','rgba(249,115,22,.8)','rgba(99,102,241,.8)',
+    'rgba(132,204,22,.8)','rgba(234,179,8,.8)','rgba(59,130,246,.8)',
+  ];
+  const PB = P.map(c=>c.replace('.8)','.15)'));
+
+  function mkChart(id, type, data, opts={}){
+    return new Chart(document.getElementById(id),{ type, data, options:{responsive:true,plugins:{legend:{labels:{color:textC,boxWidth:14}}},...opts} });
+  }
+
+  // ─── Chart 1: Column completeness (bar) ─────────
+  const labels8 = headers.slice(0,10);
+  const comp = labels8.map(h=> rows.filter(r=>r[h]&&String(r[h]).trim()!=='').length);
+  mkChart('ch1','bar',{
+    labels: labels8,
+    datasets:[{label:'Non-null rows', data:comp, backgroundColor:P, borderRadius:5, borderSkipped:false}]
+  },{scales:{x:{ticks:{color:textC}},y:{beginAtZero:true,ticks:{color:textC}}},plugins:{legend:{display:false}}});
+
+  // ─── Chart 2: Column type ratio (doughnut) ──────
+  mkChart('ch2','doughnut',{
+    labels:['Numeric','Text'],
+    datasets:[{data:[numCols.length, txtCols.length], backgroundColor:['rgba(59, 90, 120, .8)','rgba(148, 163, 184, .8)'], borderWidth:0}]
+  },{cutout:'58%', plugins:{legend:{position:'bottom',labels:{color:textC}}}});
+
+  // ─── Chart 3: Numeric averages (line) ───────────
+  const nc8 = numCols.slice(0,8);
+  const avgs = nc8.map(c=>+avg(numVals(c)).toFixed(3));
+  mkChart('ch3','line',{
+    labels:nc8,
+    datasets:[{label:'Average', data:avgs, borderColor:'rgba(245,158,11,1)',
+      backgroundColor:'rgba(245,158,11,.1)', tension:.4, fill:true,
+      pointRadius:5, pointBackgroundColor:'rgba(245,158,11,1)'}]
+  },{scales:{x:{ticks:{color:textC}},y:{ticks:{color:textC}}},plugins:{legend:{display:false}}});
+
+  // ─── Chart 4: Top category values (horizontal bar) ─
+  const firstTxt = txtCols[0];
+  if(firstTxt){
+    const freq={};
+    colVals(firstTxt).forEach(v=>{freq[v]=(freq[v]||0)+1;});
+    const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    mkChart('ch4','bar',{
+      labels:sorted.map(x=>x[0]),
+      datasets:[{label:'Count', data:sorted.map(x=>x[1]),
+        backgroundColor:P.slice(0,sorted.length), borderRadius:5}]
+    },{indexAxis:'y', scales:{x:{ticks:{color:textC}},y:{ticks:{color:textC}}},plugins:{legend:{display:false}}});
+  } else {
+    // fallback: min values
+    const nc5=numCols.slice(0,6);
+    mkChart('ch4','bar',{
+      labels:nc5,
+      datasets:[{label:'Min', data:nc5.map(c=>+Math.min(...numVals(c)).toFixed(2)),
+        backgroundColor:P.slice(0,nc5.length), borderRadius:5}]
+    },{indexAxis:'y', scales:{x:{ticks:{color:textC}},y:{ticks:{color:textC}}},plugins:{legend:{display:false}}});
+  }
+
+  // ─── Chart 5: Radar (normalized averages) ───────
+  const nc6=numCols.slice(0,6);
+  const maxAvg=Math.max(...nc6.map(c=>avg(numVals(c))),1);
+  mkChart('ch5','radar',{
+    labels:nc6,
+    datasets:[{label:'Avg (norm)',
+      data:nc6.map(c=>+(avg(numVals(c))/maxAvg*100).toFixed(1)),
+      backgroundColor:'rgba(6,182,212,.2)', borderColor:'rgba(6,182,212,.8)',
+      pointBackgroundColor:'rgba(6,182,212,1)', pointRadius:4}]
+  },{scales:{r:{ticks:{color:textC,backdropColor:'transparent'},grid:{color:gridC},pointLabels:{color:textC}}}});
+
+  // ─── Chart 6: Scatter (first 2 numeric cols) ────
+  const sc1=numCols[0], sc2=numCols[1]||numCols[0];
+  const scatterPts = rows.slice(0,80).map(r=>({
+    x:+parseFloat(String(r[sc1]).replace(',','')),
+    y:+parseFloat(String(r[sc2]).replace(',',''))
+  })).filter(p=>!isNaN(p.x)&&!isNaN(p.y));
+  mkChart('ch6','scatter',{
+    datasets:[{label:`${sc1} vs ${sc2}`, data:scatterPts,
+      backgroundColor:'rgba(236,72,153,.6)', pointRadius:5}]
+  },{scales:{
+    x:{title:{display:true,text:sc1,color:textC},ticks:{color:textC}},
+    y:{title:{display:true,text:sc2,color:textC},ticks:{color:textC}}
+  }});
+
+  // ─── Chart 7: Stacked data presence ─────────────
+  const sl=headers.slice(0,8);
+  const present=sl.map(h=>rows.filter(r=>r[h]&&String(r[h]).trim()!=='').length);
+  const absent=sl.map((h,i)=>n-present[i]);
+  mkChart('ch7','bar',{
+    labels:sl,
+    datasets:[
+      {label:'Present', data:present, backgroundColor:'rgba(16,185,129,.75)', borderRadius:3},
+      {label:'Missing', data:absent, backgroundColor:'rgba(239,68,68,.55)', borderRadius:3}
+    ]
+  },{scales:{x:{stacked:true,ticks:{color:textC}},y:{stacked:true,ticks:{color:textC}}}});
+
+  // ─── Chart 8: Bubble (row idx vs first num vs second num) ─
+  const bCol1=numCols[0], bCol2=numCols[1]||numCols[0];
+  const bCol3=numCols[2]||numCols[0];
+  const bubblePts=rows.slice(0,50).map((r,i)=>{
+    const bv=parseFloat(String(r[bCol3]).replace(',',''));
+    return {x:parseFloat(String(r[bCol1]).replace(',','')),
+            y:parseFloat(String(r[bCol2]).replace(',','')),
+            r:Math.max(3,Math.min(18,isNaN(bv)?5:Math.abs(bv)/20))};
+  }).filter(p=>!isNaN(p.x)&&!isNaN(p.y));
+  mkChart('ch8','bubble',{
+    datasets:[{label:'Bubble', data:bubblePts,
+      backgroundColor:'rgba(249,115,22,.55)', borderColor:'rgba(249,115,22,.8)'}]
+  },{scales:{x:{ticks:{color:textC}},y:{ticks:{color:textC}}}});
+
+  // ─── Chart 9: Polar area (std dev per numeric col) ─
+  const nc7=numCols.slice(0,7);
+  const stds=nc7.map(c=>+stddev(numVals(c)).toFixed(3));
+  mkChart('ch9','polarArea',{
+    labels:nc7,
+    datasets:[{data:stds, backgroundColor:P.slice(0,nc7.length).map(c=>c.replace('.8)','.7)')),
+      borderWidth:0}]
+  },{scales:{r:{ticks:{color:textC,backdropColor:'transparent'},grid:{color:gridC}}}});
+
+  // ─── Chart 10: Min vs Max grouped bar ───────────
+  const nc5b=numCols.slice(0,6);
+  const mins=nc5b.map(c=>+Math.min(...numVals(c)).toFixed(2));
+  const maxs=nc5b.map(c=>+Math.max(...numVals(c)).toFixed(2));
+  mkChart('ch10','bar',{
+    labels:nc5b,
+    datasets:[
+      {label:'Min', data:mins, backgroundColor:'rgba(99,102,241,.75)', borderRadius:4},
+      {label:'Max', data:maxs, backgroundColor:'rgba(132,204,22,.75)', borderRadius:4}
+    ]
+  },{scales:{x:{ticks:{color:textC}},y:{ticks:{color:textC}}}});
+
+  // ─── Summary Table ───────────────────────────────
+  const tbody = document.getElementById('summaryBody');
+  tbody.innerHTML='';
+  headers.slice(0,10).forEach((h,i)=>{
+    const cv=colVals(h); const nv=numVals(h);
+    const isNum=isNumeric(h);
+    const uniq=new Set(cv.map(String)).size;
+    const mn=isNum?+Math.min(...nv).toFixed(3):'—';
+    const mx=isNum?+Math.max(...nv).toFixed(3):'—';
+    const av=isNum?+avg(nv).toFixed(3):'—';
+    const samp=cv[0]?String(cv[0]).slice(0,30):'—';
+    tbody.innerHTML+=`<tr>
+      <td class="text-muted">${i+1}</td>
+      <td class="fw-semibold mono">${h}</td>
+      <td><span class="type-badge ${isNum?'num':'txt'}">${isNum?'numeric':'text'}</span></td>
+      <td>${cv.length}</td><td>${uniq}</td>
+      <td class="mono">${mn}</td><td class="mono">${mx}</td><td class="mono">${av}</td>
+      <td class="text-muted" style="font-size:.8rem;">${samp}</td>
+    </tr>`;
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

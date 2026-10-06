@@ -1,0 +1,46 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Blockchain Logs{% endblock %}
+{% block page_title %}Blockchain Logs{% endblock %}
+
+{% block content %}
+
+<div class="panel-card">
+  <div class="panel-head">
+    <h5>Ledger</h5>
+    <span class="text-muted small">{{ blocks|length }} blocks</span>
+  </div>
+
+  {% if blocks %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Block ID</th>
+          <th>Data / Transaction</th>
+          <th>Hash</th>
+          <th>Previous Hash</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in blocks %}
+        <tr>
+          <td><span class="block-index-tag">#{{ b['block_index'] }}</span></td>
+          <td style="max-width: 280px;">{{ b['data'] }}</td>
+          <td><span class="hash-chip" title="{{ b['hash'] }}">{{ b['hash'][:14] }}…</span></td>
+          <td><span class="hash-chip" title="{{ b['previous_hash'] }}">{{ b['previous_hash'][:14] }}…</span></td>
+          <td class="text-muted">{{ b['timestamp'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-link-45deg"></i>
+    No blocks recorded yet. Actions like uploads and approvals will appear here.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

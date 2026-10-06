@@ -1,0 +1,97 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Approval Requests{% endblock %}
+{% block page_title %}Approval Requests{% endblock %}
+
+{% block content %}
+
+<div class="panel-card">
+  <div class="panel-head">
+    <h5>User Edit Access Requests</h5>
+    <span class="text-muted small">{{ requests|length }} total</span>
+  </div>
+
+  {% if requests %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Dataset</th>
+          <th>Reason / Requested Change</th>
+          <th>Requested</th>
+          <th>Status</th>
+          <th>Dataset Lock</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td>
+            <div class="fw-semibold">{{ r['user_name'] }}</div>
+          </td>
+          <td>
+            <div class="fw-semibold small">{{ r['dataset_name'] }}</div>
+            <div class="text-muted" style="font-size:.72rem;">{{ r['source_type'] or 'admin' }} dataset</div>
+          </td>
+          <td class="text-muted small" style="max-width:260px;">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r['requested_change'] }}">
+              {{ r['requested_change'] }}
+            </div>
+          </td>
+          <td class="text-muted small">{{ r['created_at'][:16] }}</td>
+          <td>
+            {% if r['status'] == 'Pending' %}
+              <span class="status-pill pending">Pending</span>
+            {% elif r['status'] == 'Approved' %}
+              <span class="status-pill approved">Approved</span>
+            {% else %}
+              <span class="status-pill rejected">Rejected</span>
+            {% endif %}
+          </td>
+          <td>
+            <form action="{{ url_for('admin_toggle_lock_dataset', dataset_id=r['dataset_id']) }}" method="POST" class="d-inline"
+                  data-confirm="{{ 'Unlock' if r['dataset_locked'] else 'Lock' }} '{{ r['dataset_name'] }}'?">
+              {% if r['dataset_locked'] %}
+                <button type="submit" class="status-pill locked border-0" style="cursor:pointer;" title="Click to unlock">
+                  <i class="bi bi-lock-fill"></i> Locked
+                </button>
+              {% else %}
+                <button type="submit" class="status-pill approved border-0" style="cursor:pointer;" title="Click to lock">
+                  <i class="bi bi-unlock-fill"></i> Public
+                </button>
+              {% endif %}
+            </form>
+          </td>
+          <td class="text-end">
+            {% if r['status'] == 'Pending' %}
+            <form action="{{ url_for('admin_decide_request', request_id=r['id'], decision='approve') }}"
+                  method="POST" class="d-inline" data-confirm="Approve edit access for {{ r['user_name'] }} on '{{ r['dataset_name'] }}'?">
+              <button type="submit" class="btn-action" title="Approve" style="color:var(--green);border-color:var(--green);">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </form>
+            <form action="{{ url_for('admin_decide_request', request_id=r['id'], decision='reject') }}"
+                  method="POST" class="d-inline" data-confirm="Reject this request?">
+              <button type="submit" class="btn-action delete" title="Reject">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </form>
+            {% else %}
+              <span class="text-muted small">{{ r['updated_at'][:10] if r['updated_at'] else '—' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clipboard-check"></i>
+    No edit access requests yet.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,302 @@
+{% extends "user/base_user.html" %}
+{% block title %}Dataset Selection{% endblock %}
+{% block page_title %}Dataset Selection{% endblock %}
+
+{% block extra_head %}
+<style>
+.ds-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  transition: border-color .18s, box-shadow .18s;
+}
+.ds-card:hover { border-color: var(--teal); box-shadow: 0 4px 18px rgba(59, 90, 120, .11); }
+[data-bs-theme="dark"] .ds-card { background: var(--card); border-color: var(--border); }
+[data-bs-theme="dark"] .ds-card:hover { border-color: var(--teal-light); }
+
+.ds-card .ds-name { font-family: var(--font-display); font-size: .92rem; font-weight: 700; }
+.ds-card .ds-desc { font-size: .78rem; color: var(--slate); margin-top: 3px; }
+.ds-card .ds-meta { font-size: .72rem; color: var(--slate-light); margin-top: 6px; }
+
+/* Access badge colors */
+.badge-access { padding:3px 10px; border-radius:20px; font-size:.7rem; font-weight:600; }
+.badge-access.approved  { background:rgba(16,185,129,.12); color:#10B981; }
+.badge-access.pending   { background:rgba(245,158,11,.12);  color:#F59E0B; }
+.badge-access.rejected  { background:rgba(239,68,68,.12);   color:#EF4444; }
+.badge-access.none      { background:rgba(100,116,139,.1);  color:var(--slate); }
+
+/* Admin dataset action row */
+.ds-actions { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+.btn-ds-view  { background:var(--teal); color:#fff; border:none; border-radius:8px; padding:5px 14px; font-size:.78rem; font-weight:600; cursor:pointer; }
+.btn-ds-view:hover { background:var(--teal-light); }
+.btn-ds-edit  { background:rgba(59, 90, 120, .12); color:#3B5A78; border:1px solid rgba(59, 90, 120, .3); border-radius:8px; padding:5px 14px; font-size:.78rem; font-weight:600; cursor:pointer; }
+.btn-ds-edit:hover { background:rgba(59, 90, 120, .2); }
+.btn-ds-req   { background:rgba(245,158,11,.1); color:#F59E0B; border:1px solid rgba(245,158,11,.3); border-radius:8px; padding:5px 14px; font-size:.78rem; font-weight:600; cursor:pointer; }
+.btn-ds-req:hover { background:rgba(245,158,11,.18); }
+.btn-ds-dis   { background:var(--canvas); color:var(--slate-light); border:1px solid var(--border); border-radius:8px; padding:5px 14px; font-size:.78rem; font-weight:600; cursor:not-allowed; opacity:.7; }
+
+/* Info callout */
+.info-callout { background:rgba(59, 90, 120, .07); border:1px solid rgba(59, 90, 120, .2); border-radius:10px; padding:11px 15px; font-size:.82rem; color:var(--teal); display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+[data-bs-theme="dark"] .info-callout { background:rgba(59, 90, 120, .1); border-color:rgba(59, 90, 120, .25); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<p class="text-muted mb-4" style="font-size:.95rem;">Choose a dataset to analyze. Admin datasets require an access request before editing.</p>
+
+<!-- TABS -->
+<ul class="nav nav-tabs dv-tabs mb-4" id="datasetTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-upload">
+      <i class="bi bi-upload me-1"></i> Your Data
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-external">
+      <i class="bi bi-globe me-1"></i> External Data
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sample">
+      <i class="bi bi-stars me-1"></i> Sample Datasets
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link position-relative" data-bs-toggle="tab" data-bs-target="#tab-admin">
+      <i class="bi bi-shield-check me-1"></i> Admin Datasets
+      {% if admin_datasets %}<span class="badge-dot" style="top:6px;right:4px;"></span>{% endif %}
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ── TAB 1: Your Uploads ─────────────────────────── -->
+  <div class="tab-pane fade show active" id="tab-upload">
+    <div class="row g-3">
+      <div class="col-md-5">
+        <div class="panel-card h-100">
+          <div class="panel-head"><h6><i class="bi bi-file-earmark-arrow-up me-2 text-teal"></i>Upload CSV / JSON</h6></div>
+          <form action="{{ url_for('user_upload_dataset') }}" method="POST" enctype="multipart/form-data" class="p-3">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Dataset Name</label>
+              <input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. My Sales Data" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">File</label>
+              <input type="file" name="file" class="form-control form-control-sm" accept=".csv,.json" required>
+              <div class="form-text">CSV or JSON — up to 25 MB</div>
+            </div>
+            <button type="submit" class="btn btn-brand btn-sm w-100"><i class="bi bi-upload me-1"></i>Upload & Open Dashboard</button>
+          </form>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="panel-card h-100">
+          <div class="panel-head"><h6><i class="bi bi-folder2-open me-2 text-teal"></i>Your Uploads</h6></div>
+          {% if user_datasets %}
+            <div class="p-2">
+              {% for d in user_datasets %}
+              <div class="d-flex align-items-center justify-content-between p-2 mb-1 rounded" style="background:var(--canvas);">
+                <div>
+                  <div class="fw-semibold small">{{ d['name'] }}</div>
+                  <div class="text-muted" style="font-size:.74rem;">{{ d['uploaded_at'][:10] }}</div>
+                </div>
+                <div class="d-flex gap-1">
+                  <a href="{{ url_for('user_dashboard', type='user_upload', id=d['id']) }}" class="btn-action" title="Dashboard"><i class="bi bi-bar-chart"></i></a>
+                  <a href="{{ url_for('user_chatbot', type='user_upload', id=d['id']) }}" class="btn-action" title="AI Chat"><i class="bi bi-robot"></i></a>
+                  <a href="{{ url_for('user_edit_dataset_page', dataset_id=d['id']) }}" class="btn-action" title="Edit Data"><i class="bi bi-pencil"></i></a>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state p-4"><i class="bi bi-inbox"></i><br><small>No uploads yet. Upload a file to get started.</small></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB 2: External Data ────────────────────────── -->
+  <div class="tab-pane fade" id="tab-external">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="panel-card">
+          <div class="panel-head"><h6><i class="bi bi-cloud-download me-2" style="color:#20beff;"></i>Kaggle Dataset</h6></div>
+          <div class="p-3">
+            <p class="text-muted small mb-3">Download a CSV from Kaggle and upload it via the "Your Data" tab, or open the Kaggle page directly.</p>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Kaggle Dataset URL</label>
+              <input type="url" id="kaggleUrl" class="form-control form-control-sm" placeholder="https://www.kaggle.com/datasets/...">
+            </div>
+            <button class="btn btn-sm w-100" style="background:#20beff;color:#fff;" onclick="openKaggle()">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Open Kaggle
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="panel-card">
+          <div class="panel-head"><h6><i class="bi bi-braces me-2 text-warning"></i>JSON Import</h6></div>
+          <form action="{{ url_for('user_import_json') }}" method="POST" class="p-3">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Dataset Name</label>
+              <input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. API Response Data" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Paste JSON</label>
+              <textarea name="json_data" class="form-control form-control-sm" rows="4"
+                placeholder='[{"name":"Alice","age":30},{"name":"Bob","age":25}]' required
+                style="font-family:var(--font-mono);font-size:.78rem;"></textarea>
+              <div class="form-text">Array of objects or single object</div>
+            </div>
+            <button type="submit" class="btn btn-warning btn-sm w-100 text-dark"><i class="bi bi-braces me-1"></i>Import JSON</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB 3: Sample Datasets ──────────────────────── -->
+  <div class="tab-pane fade" id="tab-sample">
+    <div class="row g-3">
+      {% for s in sample_datasets %}
+      <div class="col-md-6">
+        <div class="ds-card">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="ds-name">{{ s['name'] }}</div>
+              <div class="ds-desc">{{ s['description'] }}</div>
+            </div>
+            <span class="badge-access approved">Sample</span>
+          </div>
+          <div class="ds-actions">
+            <a href="{{ url_for('user_dashboard', type='sample', id=s['id']) }}" class="btn-ds-view"><i class="bi bi-bar-chart me-1"></i>Dashboard</a>
+            <a href="{{ url_for('user_chatbot', type='sample', id=s['id']) }}" class="btn-ds-edit" style="color:#2E4760;border-color:rgba(6,182,212,.3);"><i class="bi bi-robot me-1"></i>Ask AI</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── TAB 4: Admin Datasets ───────────────────────── -->
+  <div class="tab-pane fade" id="tab-admin">
+
+    <div class="info-callout">
+      <i class="bi bi-info-circle-fill" style="font-size:1.1rem; flex-shrink:0;"></i>
+      <div>
+        <strong>Access &amp; Edit requires approval.</strong>
+        You can always <em>view</em> and <em>visualize</em> admin datasets freely.
+        To <em>edit</em> a dataset, click <strong>Request Edit Access</strong> — the admin will review and approve your request before you can make changes.
+      </div>
+    </div>
+
+    {% if admin_datasets %}
+    <div class="row g-3">
+      {% for d in admin_datasets %}
+      {% set my_req = access_map.get(d['id']) %}
+      <div class="col-md-6 col-lg-4">
+        <div class="ds-card h-100 d-flex flex-column">
+          <div class="d-flex align-items-start justify-content-between mb-1">
+            <div class="ds-name">{{ d['name'] }}</div>
+            {% if my_req %}
+              {% if my_req['status'] == 'Approved' %}
+                <span class="badge-access approved"><i class="bi bi-check-circle-fill me-1"></i>Access Granted</span>
+              {% elif my_req['status'] == 'Pending' %}
+                <span class="badge-access pending"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+              {% else %}
+                <span class="badge-access rejected"><i class="bi bi-x-circle-fill me-1"></i>Rejected</span>
+              {% endif %}
+            {% else %}
+              <span class="badge-access none"><i class="bi bi-lock me-1"></i>No Access</span>
+            {% endif %}
+          </div>
+          <div class="ds-desc">{{ d['description'] or 'No description provided.' }}</div>
+          <div class="ds-meta">
+            <i class="bi bi-person me-1"></i>{{ d['uploader_name'] }} &nbsp;·&nbsp;
+            <i class="bi bi-calendar3 me-1"></i>{{ d['uploaded_at'][:10] }}
+          </div>
+
+          <div class="ds-actions mt-auto">
+            <!-- View / Dashboard — always available -->
+            <a href="{{ url_for('user_dashboard', type='admin', id=d['id']) }}" class="btn-ds-view" title="View Charts"><i class="bi bi-bar-chart me-1"></i>View</a>
+            <a href="{{ url_for('user_chatbot', type='admin', id=d['id']) }}" class="btn-ds-edit" style="color:#2E4760;border-color:rgba(6,182,212,.3);" title="Ask AI"><i class="bi bi-robot me-1"></i>Chat</a>
+
+            <!-- Edit: only if Approved -->
+            {% if my_req and my_req['status'] == 'Approved' %}
+              <a href="{{ url_for('user_edit_dataset_page', dataset_id=d['id']) }}" class="btn-ds-edit"><i class="bi bi-pencil me-1"></i>Edit</a>
+            {% elif my_req and my_req['status'] == 'Pending' %}
+              <span class="btn-ds-dis"><i class="bi bi-hourglass-split me-1"></i>Awaiting</span>
+            {% elif my_req and my_req['status'] == 'Rejected' %}
+              <!-- Allow re-request -->
+              <button class="btn-ds-req" onclick="openRequestModal({{ d['id'] }}, '{{ d['name']|replace("'","\\'")|safe }}')">
+                <i class="bi bi-arrow-repeat me-1"></i>Re-request
+              </button>
+            {% else %}
+              <button class="btn-ds-req" onclick="openRequestModal({{ d['id'] }}, '{{ d['name']|replace("'","\\'")|safe }}')">
+                <i class="bi bi-send me-1"></i>Request Edit
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="bi bi-shield-x"></i><br>No admin datasets available yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Request Edit Access Modal -->
+<div class="modal fade" id="requestModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:16px;border:none;">
+      <form action="{{ url_for('user_request_edit_access') }}" method="POST">
+        <input type="hidden" name="dataset_id" id="reqDatasetId">
+        <div class="modal-header border-0">
+          <h5 class="modal-title"><i class="bi bi-send me-2 text-teal"></i>Request Edit Access</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">
+            You're requesting <strong>edit access</strong> to:
+            <strong id="reqDatasetName" class="text-teal"></strong>
+          </p>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Reason for edit access <span class="text-muted">(required)</span></label>
+            <textarea class="form-control" name="requested_change" rows="3"
+              placeholder="Describe what changes you need to make and why…" required></textarea>
+          </div>
+          <div class="alert" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:10px 14px;font-size:.8rem;color:#92400E;">
+            <i class="bi bi-clock me-1"></i>
+            The admin will review your request. You'll receive a notification once it's approved or rejected.
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand px-4"><i class="bi bi-send me-1"></i>Send Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openKaggle(){
+  const url=document.getElementById('kaggleUrl').value.trim();
+  window.open(url||'https://www.kaggle.com/datasets','_blank');
+}
+function openRequestModal(id, name){
+  document.getElementById('reqDatasetId').value = id;
+  document.getElementById('reqDatasetName').textContent = name;
+  new bootstrap.Modal(document.getElementById('requestModal')).show();
+}
+</script>
+{% endblock %}

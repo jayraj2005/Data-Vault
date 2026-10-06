@@ -1,0 +1,177 @@
+{% extends "user/base_user.html" %}
+{% block title %}History{% endblock %}
+{% block page_title %}History{% endblock %}
+
+{% block content %}
+
+<!-- Tabs -->
+<ul class="nav nav-pills mb-3" id="historyTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-btn-activity" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button" role="tab">
+      <i class="bi bi-activity me-1"></i>Activity History
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-btn-chat" data-bs-toggle="tab" data-bs-target="#tab-chat" type="button" role="tab">
+      <i class="bi bi-robot me-1"></i>AI Chat History
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+<!-- ══════════════ Activity History ══════════════ -->
+<div class="tab-pane fade show active" id="tab-activity" role="tabpanel">
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <p class="text-muted mb-0 small">Everything you've done on DataVault — uploads, edits, requests, reports and more.</p>
+  {% if activity %}
+  <form action="{{ url_for('user_delete_all_activity') }}" method="POST" onsubmit="return confirm('Clear minor activity entries? Entries for your major work (uploads, edits, requests, reports, logins) will be kept.')">
+    <button type="submit" class="btn btn-sm btn-outline-danger">
+      <i class="bi bi-trash3 me-1"></i>Clear Minor Activity
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+{% if activity %}
+<div class="panel-card">
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Details</th>
+          <th>When</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in activity %}
+        <tr>
+          <td class="fw-semibold small">{{ a['action'] }}</td>
+          <td class="text-muted small">{{ a['details'] or '—' }}</td>
+          <td class="text-muted small">{{ a['created_at'] }}</td>
+          <td class="text-end">
+            {% if a['action'] in major_work_actions %}
+              <span class="text-muted small" title="This is part of your major work and can't be deleted.">
+                <i class="bi bi-shield-lock me-1"></i>Protected
+              </span>
+            {% else %}
+              <form action="{{ url_for('user_delete_activity', history_id=a['id']) }}" method="POST" class="d-inline"
+                    onsubmit="return confirm('Delete this activity entry?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete this entry">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="panel-card text-center py-5">
+  <i class="bi bi-activity" style="font-size:3rem;color:var(--teal);opacity:0.4;"></i>
+  <h5 class="mt-3">No Activity Yet</h5>
+  <p class="text-muted">Actions you take on DataVault — uploads, edits, requests and more — will show up here.</p>
+</div>
+{% endif %}
+
+</div>
+
+<!-- ══════════════ AI Chat History ══════════════ -->
+<div class="tab-pane fade" id="tab-chat" role="tabpanel">
+
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <p class="text-muted mb-0 small">Your AI conversation history across all datasets.</p>
+  {% if chat_history %}
+  <form action="{{ url_for('user_delete_all_chat') }}" method="POST" onsubmit="return confirm('Clear ALL chat history? This cannot be undone.')">
+    <button type="submit" class="btn btn-sm btn-outline-danger">
+      <i class="bi bi-trash3 me-1"></i>Clear All History
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+{% if chat_history %}
+
+<!-- Group by dataset -->
+{% set seen_datasets = [] %}
+{% for ch in chat_history %}
+  {% if ch['dataset_name'] not in seen_datasets %}
+    {% set _ = seen_datasets.append(ch['dataset_name']) %}
+  {% endif %}
+{% endfor %}
+
+{% for ds_name in seen_datasets %}
+<div class="panel-card mb-3">
+  <div class="panel-head">
+    <div class="d-flex align-items-center gap-2">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--teal);display:inline-block;"></span>
+      <h6 class="mb-0">{{ ds_name or 'Unknown Dataset' }}</h6>
+    </div>
+    <span class="text-muted small">
+      {% set count = chat_history | selectattr('dataset_name', 'equalto', ds_name) | list | length %}
+      {{ count }} conversation{{ 's' if count != 1 else '' }}
+    </span>
+  </div>
+
+  {% for ch in chat_history %}
+  {% if ch['dataset_name'] == ds_name %}
+  <div class="history-entry px-3 py-3" style="border-bottom:1px solid var(--border);">
+    <div class="d-flex align-items-start justify-content-between gap-3">
+      <div class="flex-grow-1">
+        <!-- Question -->
+        <div class="d-flex align-items-start gap-2 mb-2">
+          <div class="chat-avatar user sm">{{ logged_in_name[:1] if logged_in_name else 'U' }}</div>
+          <div>
+            <div class="fw-semibold small">{{ ch['question'] }}</div>
+          </div>
+        </div>
+        <!-- Answer -->
+        <div class="d-flex align-items-start gap-2">
+          <div class="chat-avatar ai sm"><i class="bi bi-robot"></i></div>
+          <div class="text-muted small answer-text" style="line-height:1.5;">{{ ch['answer']|truncate(300) }}</div>
+        </div>
+        <div class="text-muted mt-2" style="font-size:0.72rem;padding-left:calc(28px + 0.5rem);">
+          <i class="bi bi-clock me-1"></i>{{ ch['created_at'] }}
+        </div>
+      </div>
+      <!-- Actions -->
+      <div class="flex-shrink-0 d-flex flex-column gap-1 align-items-end">
+        <form action="{{ url_for('user_delete_chat', chat_id=ch['id']) }}" method="POST">
+          <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete this entry" onclick="return confirm('Delete this chat entry?')">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+        <a href="{{ url_for('user_chatbot', type='sample' if ch['dataset_id'] is none else 'admin', id=ch['dataset_id'] or '') }}" 
+           class="btn btn-sm btn-light" title="Ask again">
+          <i class="bi bi-arrow-repeat"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="panel-card text-center py-5">
+  <i class="bi bi-clock-history" style="font-size:3rem;color:var(--teal);opacity:0.4;"></i>
+  <h5 class="mt-3">No Chat History Yet</h5>
+  <p class="text-muted">Start a conversation with the AI Chatbot to see your history here.</p>
+  <a href="{{ url_for('user_chatbot') }}" class="btn btn-brand">
+    <i class="bi bi-robot me-1"></i>Open AI Chatbot
+  </a>
+</div>
+{% endif %}
+
+</div>
+
+</div>
+
+{% endblock %}

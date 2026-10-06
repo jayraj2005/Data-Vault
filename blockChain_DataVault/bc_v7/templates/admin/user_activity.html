@@ -1,0 +1,117 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}User Activity{% endblock %}
+{% block page_title %}User Activity{% endblock %}
+
+{% block content %}
+
+<!-- Top bar -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <p class="text-muted small mb-0">
+    Click any user card to drill into their full session log and charts.
+    Use <strong>Reset</strong> to wipe one user's data, or <strong>Clear All Login Data</strong>
+    to remove every login session entry site-wide.
+  </p>
+  <form action="{{ url_for('admin_clear_all_login_data') }}" method="POST"
+        data-confirm="This will permanently delete ALL login session records and login/logout history for every user. User accounts and datasets are NOT affected. Continue?">
+    <button type="submit" class="btn btn-sm d-flex align-items-center gap-2"
+            style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.35);
+                   color:#ef4444;border-radius:8px;padding:7px 16px;font-weight:600;font-size:.84rem;">
+      <i class="bi bi-database-dash"></i> Clear All Login Data
+    </button>
+  </form>
+</div>
+
+{% if summary %}
+<div class="user-activity-grid">
+  {% for s in summary %}
+  <div class="user-activity-card" style="position:relative;">
+
+    <!-- Reset button (top-right corner of card) -->
+    <form action="{{ url_for('admin_reset_user_activity', user_id=s.user['id']) }}" method="POST"
+          style="position:absolute;top:12px;right:12px;z-index:2;"
+          data-confirm="Reset all activity for '{{ s.user['name'] }}'? This clears their sessions, action log, and chat history. Their account and datasets are kept.">
+      <button type="submit"
+              title="Reset this user's activity data"
+              style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.3);
+                     color:#ef4444;border-radius:7px;padding:4px 10px;font-size:.78rem;
+                     font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;
+                     transition:all .15s ease;"
+              onmouseover="this.style.background='rgba(239,68,68,0.22)'"
+              onmouseout="this.style.background='rgba(239,68,68,0.10)'">
+        <i class="bi bi-arrow-counterclockwise"></i> Reset
+      </button>
+    </form>
+
+    <!-- Clickable area links to detail page -->
+    <a href="{{ url_for('admin_user_activity_detail', user_id=s.user['id']) }}"
+       style="text-decoration:none;color:inherit;display:block;">
+
+      <div class="ua-top" style="padding-right:80px;">
+        <div class="ua-avatar">
+          {% if s.user['avatar'] %}
+            <img src="{{ url_for('static', filename='uploads/avatars/' + s.user['avatar']) }}" alt="">
+          {% else %}
+            {{ s.user['name'][:1]|upper }}
+          {% endif %}
+          {% if s.is_online %}
+            <span class="online-dot" title="Currently online"></span>
+          {% endif %}
+        </div>
+        <div class="flex-grow-1" style="min-width:0;">
+          <div class="ua-name text-truncate">{{ s.user['name'] }}</div>
+          <div class="ua-email text-truncate">{{ s.user['email'] }}</div>
+        </div>
+        <i class="bi bi-chevron-right text-muted"></i>
+      </div>
+
+      <div class="ua-stats-row">
+        <div>
+          <strong>{{ s.total_seconds|hms }}</strong>
+          time on portal
+        </div>
+        <div>
+          <strong>{{ s.action_count }}</strong>
+          actions
+        </div>
+        <div>
+          <strong>{{ s.session_count }}</strong>
+          sessions
+        </div>
+      </div>
+
+      <!-- Inline mini status bar -->
+      <div style="padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;">
+        {% if s.is_online %}
+          <span style="font-size:.72rem;background:rgba(34,197,94,.12);color:#22c55e;
+                       border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:2px 9px;font-weight:600;">
+            ● Online now
+          </span>
+        {% else %}
+          <span style="font-size:.72rem;background:rgba(100,116,139,.1);color:var(--slate);
+                       border:1px solid rgba(100,116,139,.2);border-radius:20px;padding:2px 9px;">
+            Offline
+          </span>
+        {% endif %}
+        {% if s.action_count == 0 and s.session_count == 0 %}
+          <span style="font-size:.72rem;background:rgba(245,158,11,.1);color:#f59e0b;
+                       border:1px solid rgba(245,158,11,.25);border-radius:20px;padding:2px 9px;">
+            No activity yet
+          </span>
+        {% endif %}
+      </div>
+
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="panel-card">
+  <div class="empty-state">
+    <i class="bi bi-people"></i>
+    No registered users yet.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Uploaded Datasets{% endblock %}
+{% block page_title %}Uploaded Datasets{% endblock %}
+
+{% block content %}
+
+<!-- ── Blockchain Ledger Summary ──────────────────────────── -->
+<div class="dv-info-banner" id="blockchainHero">
+  <div class="dv-info-banner-body">
+    <span class="live-dot">Live Network</span>
+    <div class="hero-label">DataVault Blockchain</div>
+    <h2 class="hero-title">Immutable Dataset Ledger</h2>
+    <p class="hero-sub">Every upload, approval and change is sealed permanently in the chain. Nothing can be altered retroactively.</p>
+  </div>
+  <div class="dv-hero-stats">
+    <div class="dv-hero-stat">
+      <span class="hs-val">{{ datasets|length }}</span>
+      <span class="hs-lbl">Datasets on chain</span>
+    </div>
+    <div class="dv-hero-stat">
+      <span class="hs-val">100%</span>
+      <span class="hs-lbl">Chain integrity</span>
+    </div>
+    <div class="dv-hero-stat">
+      <span class="hs-val">SHA-256</span>
+      <span class="hs-lbl">Hash algorithm</span>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-muted small mb-0">Datasets here are visible to every user until you lock or remove them. CSV uploads must already be clean (no duplicates, missing values, or outliers) — unclean files are rejected.</p>
+  <button class="btn btn-brand px-3" data-bs-toggle="modal" data-bs-target="#uploadModal">
+    <i class="bi bi-upload me-1"></i> Upload Dataset
+  </button>
+</div>
+
+<div class="panel-card">
+  <div class="panel-head">
+    <h5>All Datasets</h5>
+    <span class="text-muted small">{{ datasets|length }} total</span>
+  </div>
+
+  {% if datasets %}
+  <div class="table-responsive">
+    <table class="table table-clean mb-0">
+      <thead>
+        <tr>
+          <th>Dataset Name</th>
+          <th>Description</th>
+          <th>Uploaded By</th>
+          <th>Date</th>
+          <th>Visibility</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in datasets %}
+        <tr>
+          <td class="fw-semibold">{{ d['name'] }}</td>
+          <td class="text-muted">{{ d['description'] or '—' }}</td>
+          <td>{{ d['uploader_name'] }}</td>
+          <td class="text-muted">{{ d['uploaded_at'] }}</td>
+          <td>
+            {% if d['is_locked'] %}
+              <span class="status-pill locked"><i class="bi bi-lock-fill"></i> Locked</span>
+            {% else %}
+              <span class="status-pill approved"><i class="bi bi-unlock-fill"></i> Public</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('download_dataset', dataset_id=d['id']) }}" class="btn-action" title="View / Download">
+              <i class="bi bi-eye"></i>
+            </a>
+            <button type="button" class="btn-action" title="Update dataset name"
+                    data-bs-toggle="modal" data-bs-target="#renameModal{{ d['id'] }}">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form action="{{ url_for('admin_toggle_lock_dataset', dataset_id=d['id']) }}" method="POST" class="d-inline"
+                  data-confirm="{{ 'Unlock' if d['is_locked'] else 'Lock' }} '{{ d['name'] }}'? {{ 'Users will be able to see it again.' if d['is_locked'] else 'It will be hidden from every user until you unlock it.' }}">
+              <button type="submit" class="btn-action {{ 'locked-active' if d['is_locked'] else '' }}" title="{{ 'Unlock dataset' if d['is_locked'] else 'Lock dataset' }}">
+                <i class="bi {{ 'bi-unlock' if d['is_locked'] else 'bi-lock' }}"></i>
+              </button>
+            </form>
+            <form action="{{ url_for('admin_delete_dataset', dataset_id=d['id']) }}" method="POST"
+                  class="d-inline" data-confirm="Delete '{{ d['name'] }}'? This cannot be undone.">
+              <button type="submit" class="btn-action delete" title="Delete">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+
+        <!-- Rename Modal -->
+        <div class="modal fade" id="renameModal{{ d['id'] }}" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 16px; border: none;">
+              <form action="{{ url_for('admin_rename_dataset', dataset_id=d['id']) }}" method="POST">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title">Update Dataset Name</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <label class="form-label small text-muted">Dataset name</label>
+                  <input type="text" class="form-control" name="name" value="{{ d['name'] }}" required>
+                </div>
+                <div class="modal-footer border-0">
+                  <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-brand px-4">Save Name</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-database"></i>
+    No datasets uploaded yet. Click "Upload Dataset" to add the first one.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 16px; border: none;">
+      <form action="{{ url_for('admin_datasets') }}" method="POST" enctype="multipart/form-data">
+        <div class="modal-header border-0">
+          <h5 class="modal-title">Upload Dataset</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small text-muted">Dataset name</label>
+            <input type="text" class="form-control" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted">Description (optional)</label>
+            <textarea class="form-control" name="description" rows="2"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small text-muted">File</label>
+            <input type="file" class="form-control" name="file" required>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand px-4">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
